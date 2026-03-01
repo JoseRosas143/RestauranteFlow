@@ -12,8 +12,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, query, limit, getDocs } from 'firebase/firestore';
-import { Plus, Trash2, Package, Tag, Layers, Percent, Database, Loader2, Save, Image as ImageIcon } from 'lucide-react';
+import { collection, addDoc, deleteDoc, doc, query, limit, getDocs, writeBatch } from 'firebase/firestore';
+import { Plus, Trash2, Package, Tag, Layers, Percent, Database, Loader2, Save, Image as ImageIcon, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, Category, Modifier, Discount, SoldBy, TpvShape, DiscountType } from '@/lib/types';
 import { INITIAL_MENU } from '@/lib/mock-data';
@@ -34,38 +34,38 @@ export default function AdminDashboard() {
   }, []);
 
   const seedData = async () => {
+    if (isSeeding) return;
     setIsSeeding(true);
     try {
       const menuRef = collection(db, 'menu');
       const snap = await getDocs(query(menuRef, limit(1)));
+      
       if (!snap.empty) {
         toast({ title: "Datos ya existentes", description: "El catálogo ya contiene información." });
         setIsSeeding(false);
         return;
       }
 
+      const batch = writeBatch(db);
+
       // Cargar categorías básicas
-      const catPromises = ['Sándwiches', 'Entradas', 'Bebidas', 'Acompañamientos'].map(name => 
-        addDoc(collection(db, 'categories'), { name, color: '#B8732E' })
-      );
-      await Promise.all(catPromises);
+      const defaultCats = ['Sándwiches', 'Entradas', 'Bebidas', 'Acompañamientos'];
+      for (const catName of defaultCats) {
+        const catRef = doc(collection(db, 'categories'));
+        batch.set(catRef, { name: catName, color: '#B8732E' });
+      }
 
       // Cargar menú inicial
-      const menuPromises = INITIAL_MENU.map(item => {
-        const { id, ...data } = item;
-        return addDoc(collection(db, 'menu'), {
-          ...data,
-          soldBy: 'unidad',
-          trackInventory: false,
-          tpvColor: '#B8732E',
-          tpvShape: 'cuadrado'
-        });
-      });
-      await Promise.all(menuPromises);
+      for (const item of INITIAL_MENU) {
+        const itemRef = doc(collection(db, 'menu'));
+        batch.set(itemRef, item);
+      }
 
+      await batch.commit();
       toast({ title: "¡Éxito!", description: "Catálogo inicial cargado correctamente." });
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los datos." });
+      console.error("Error seeding data:", error);
+      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los datos iniciales." });
     } finally {
       setIsSeeding(false);
     }
@@ -75,12 +75,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <header className="bg-white border-b px-8 py-6 flex justify-between items-center">
+      <header className="bg-white border-b px-8 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Catálogo</h1>
+          <h1 className="text-3xl font-bold text-primary">Gestión de Catálogo</h1>
           <p className="text-muted-foreground">Configura tus artículos, categorías y reglas de venta.</p>
         </div>
-        <Button variant="outline" onClick={seedData} disabled={isSeeding}>
+        <Button variant="outline" onClick={seedData} disabled={isSeeding} className="border-primary text-primary hover:bg-primary/5">
           {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
           Cargar Catálogo Inicial
         </Button>
@@ -88,11 +88,11 @@ export default function AdminDashboard() {
 
       <main className="flex-1 p-8">
         <Tabs defaultValue="articulos" className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-            <TabsTrigger value="articulos" className="gap-2"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
-            <TabsTrigger value="categorias" className="gap-2"><Layers className="h-4 w-4" /> Categorías</TabsTrigger>
-            <TabsTrigger value="modificadores" className="gap-2"><Tag className="h-4 w-4" /> Modificadores</TabsTrigger>
-            <TabsTrigger value="descuentos" className="gap-2"><Percent className="h-4 w-4" /> Descuentos</TabsTrigger>
+          <TabsList className="bg-white border shadow-sm w-full max-w-2xl">
+            <TabsTrigger value="articulos" className="flex-1 gap-2"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
+            <TabsTrigger value="categorias" className="flex-1 gap-2"><Layers className="h-4 w-4" /> Categorías</TabsTrigger>
+            <TabsTrigger value="modificadores" className="flex-1 gap-2"><Tag className="h-4 w-4" /> Modificadores</TabsTrigger>
+            <TabsTrigger value="descuentos" className="flex-1 gap-2"><Percent className="h-4 w-4" /> Descuentos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="articulos">
@@ -129,16 +129,26 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
     trackInventory: false,
     inventoryCount: 0,
     tpvColor: '#B8732E',
-    tpvShape: 'cuadrado'
+    tpvShape: 'cuadrado',
+    reference: '',
+    barcode: ''
   });
 
   const saveItem = async () => {
-    if (!newItem.name || !newItem.price) return;
+    if (!newItem.name || !newItem.price) {
+      toast({ variant: 'destructive', title: "Faltan datos", description: "Nombre y precio son obligatorios." });
+      return;
+    }
     setLoading(true);
     try {
-      await addDoc(collection(db, 'menu'), newItem);
-      toast({ title: "Artículo Guardado" });
-      setNewItem({ name: '', price: 0, cost: 0, category: '', soldBy: 'unidad', trackInventory: false, tpvColor: '#B8732E', tpvShape: 'cuadrado' });
+      await addDoc(collection(db, 'menu'), {
+        ...newItem,
+        price: Number(newItem.price),
+        cost: Number(newItem.cost),
+        inventoryCount: newItem.trackInventory ? Number(newItem.inventoryCount) : 0
+      });
+      toast({ title: "Artículo Guardado", description: `${newItem.name} se agregó al catálogo.` });
+      setNewItem({ name: '', price: 0, cost: 0, category: '', soldBy: 'unidad', trackInventory: false, tpvColor: '#B8732E', tpvShape: 'cuadrado', reference: '', barcode: '' });
     } catch (e) {
       toast({ variant: 'destructive', title: "Error al guardar" });
     } finally {
@@ -147,23 +157,31 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
   };
 
   const deleteItem = async (id: string) => {
-    await deleteDoc(doc(db, 'menu', id));
+    try {
+      await deleteDoc(doc(db, 'menu', id));
+      toast({ title: "Artículo Eliminado" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "No se pudo eliminar" });
+    }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <Card className="lg:col-span-1">
-        <CardHeader><CardTitle>Nuevo Artículo</CardTitle></CardHeader>
+      <Card className="lg:col-span-1 shadow-md border-primary/20">
+        <CardHeader className="bg-primary/5 border-b mb-4">
+          <CardTitle className="text-xl">Nuevo Artículo</CardTitle>
+          <CardDescription>Crea un producto para tu terminal de venta.</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Nombre del Plato/Bebida</Label>
-            <Input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="Ej: Choripán Especial" />
+            <Input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="Ej: Choripán Especial" className="h-11" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Categoría</Label>
-              <Select onValueChange={v => setNewItem({...newItem, category: v})}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <Select onValueChange={v => setNewItem({...newItem, category: v})} value={newItem.category}>
+                <SelectTrigger className="h-11"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                 <SelectContent>
                   {categories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
@@ -171,8 +189,8 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
             </div>
             <div className="space-y-2">
               <Label>Vendido por</Label>
-              <Select onValueChange={(v: SoldBy) => setNewItem({...newItem, soldBy: v})}>
-                <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
+              <Select onValueChange={(v: SoldBy) => setNewItem({...newItem, soldBy: v})} value={newItem.soldBy}>
+                <SelectTrigger className="h-11"><SelectValue placeholder="Unidad" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unidad">Unidad</SelectItem>
                   <SelectItem value="peso">Peso</SelectItem>
@@ -182,88 +200,115 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Precio de Venta</Label>
-              <Input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} />
+              <Label>Precio de Venta ($)</Label>
+              <Input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} className="h-11" />
             </div>
             <div className="space-y-2">
-              <Label>Coste</Label>
-              <Input type="number" value={newItem.cost} onChange={e => setNewItem({...newItem, cost: Number(e.target.value)})} />
+              <Label>Coste ($)</Label>
+              <Input type="number" value={newItem.cost} onChange={e => setNewItem({...newItem, cost: Number(e.target.value)})} className="h-11" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Referencia / SKU</Label>
-              <Input value={newItem.reference} onChange={e => setNewItem({...newItem, reference: e.target.value})} />
+              <Input value={newItem.reference} onChange={e => setNewItem({...newItem, reference: e.target.value})} placeholder="SKU-123" />
             </div>
             <div className="space-y-2">
               <Label>Código de Barras</Label>
-              <Input value={newItem.barcode} onChange={e => setNewItem({...newItem, barcode: e.target.value})} />
+              <Input value={newItem.barcode} onChange={e => setNewItem({...newItem, barcode: e.target.value})} placeholder="789..." />
             </div>
           </div>
-          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border border-dashed">
             <div className="space-y-0.5">
-              <Label>Seguir Inventario</Label>
-              <p className="text-xs text-muted-foreground">Controlar stock disponible</p>
+              <Label className="text-base">Seguir Inventario</Label>
+              <p className="text-xs text-muted-foreground">Controlar stock disponible automáticamente</p>
             </div>
             <Switch checked={newItem.trackInventory} onCheckedChange={v => setNewItem({...newItem, trackInventory: v})} />
           </div>
           {newItem.trackInventory && (
-            <div className="space-y-2">
-              <Label>Piezas en Stock</Label>
-              <Input type="number" value={newItem.inventoryCount} onChange={e => setNewItem({...newItem, inventoryCount: Number(e.target.value)})} />
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+              <Label>Piezas en Stock inicial</Label>
+              <Input type="number" value={newItem.inventoryCount} onChange={e => setNewItem({...newItem, inventoryCount: Number(e.target.value)})} className="h-11" />
             </div>
           )}
-          <div className="space-y-2 pt-2 border-t">
-            <Label>Representación TPV</Label>
+          <div className="space-y-3 pt-4 border-t">
+            <Label className="flex items-center gap-2"><Settings className="h-4 w-4" /> Apariencia en TPV</Label>
             <div className="grid grid-cols-2 gap-4">
-              <Input type="color" value={newItem.tpvColor} onChange={e => setNewItem({...newItem, tpvColor: e.target.value})} className="h-10 p-1" />
-              <Select onValueChange={(v: TpvShape) => setNewItem({...newItem, tpvShape: v})}>
-                <SelectTrigger><SelectValue placeholder="Forma" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cuadrado">Cuadrado</SelectItem>
-                  <SelectItem value="circulo">Círculo</SelectItem>
-                  <SelectItem value="hexágono">Hexágono</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground">Color</span>
+                <Input type="color" value={newItem.tpvColor} onChange={e => setNewItem({...newItem, tpvColor: e.target.value})} className="h-10 p-1 cursor-pointer" />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground">Forma</span>
+                <Select onValueChange={(v: TpvShape) => setNewItem({...newItem, tpvShape: v})} value={newItem.tpvShape}>
+                  <SelectTrigger className="h-10"><SelectValue placeholder="Forma" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cuadrado">Cuadrado</SelectItem>
+                    <SelectItem value="circulo">Círculo</SelectItem>
+                    <SelectItem value="hexágono">Hexágono</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-          <Button className="w-full mt-4" onClick={saveItem} disabled={loading}>
-            {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          <Button className="w-full mt-4 h-12 text-lg font-bold" onClick={saveItem} disabled={loading}>
+            {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
             Guardar Artículo
           </Button>
         </CardContent>
       </Card>
 
-      <Card className="lg:col-span-2">
-        <CardHeader><CardTitle>Lista de Artículos ({items.length})</CardTitle></CardHeader>
+      <Card className="lg:col-span-2 shadow-md">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Lista de Artículos</CardTitle>
+            <CardDescription>{items.length} productos registrados en total.</CardDescription>
+          </div>
+          <Badge variant="outline" className="h-6">Actualizado</Badge>
+        </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[600px] pr-4">
-            <div className="space-y-2">
-              {items.map(item => (
-                <div key={item.id} className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/10">
-                  <div className="flex items-center gap-4">
-                    <div 
-                      className="w-10 h-10 rounded-md border flex items-center justify-center text-white font-bold"
-                      style={{ backgroundColor: item.tpvColor, borderRadius: item.tpvShape === 'circulo' ? '50%' : '8px' }}
-                    >
-                      {item.name[0]}
+          <ScrollArea className="h-[650px] pr-4">
+            {items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-muted-foreground opacity-50 border-2 border-dashed rounded-xl">
+                <Package className="h-12 w-12 mb-2" />
+                <p>No hay artículos. Empieza por crear uno o carga el catálogo inicial.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {items.map(item => (
+                  <div key={item.id} className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/10 transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <div 
+                        className="w-12 h-12 shadow-sm border flex items-center justify-center text-white font-black text-xl"
+                        style={{ 
+                          backgroundColor: item.tpvColor || '#B8732E', 
+                          borderRadius: item.tpvShape === 'circulo' ? '50%' : item.tpvShape === 'hexágono' ? '12px' : '8px' 
+                        }}
+                      >
+                        {item.name[0]}
+                      </div>
+                      <div>
+                        <div className="font-bold text-base">{item.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2">
+                          <span className="font-semibold text-primary">{item.category}</span>
+                          <span>•</span>
+                          <span>${item.price.toFixed(2)}</span>
+                        </div>
+                        {item.reference && <div className="text-[10px] text-muted-foreground/60 mt-1">Ref: {item.reference}</div>}
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-bold">{item.name}</div>
-                      <div className="text-xs text-muted-foreground">{item.category} • ${item.price.toFixed(2)}</div>
+                    <div className="flex flex-col items-end gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id!)} className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-4 w-4" /></Button>
+                      {item.trackInventory && (
+                        <Badge variant={item.inventoryCount! < 10 ? 'destructive' : 'secondary'} className="text-[10px]">
+                          Stock: {item.inventoryCount}
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    {item.trackInventory && (
-                      <Badge variant="outline" className={item.inventoryCount! < 10 ? 'text-red-500 border-red-200 bg-red-50' : ''}>
-                        Stock: {item.inventoryCount}
-                      </Badge>
-                    )}
-                    <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id!)} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </ScrollArea>
         </CardContent>
       </Card>
@@ -284,26 +329,29 @@ function CategoriasManager({ categories }: { categories: Category[] }) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <Card>
+      <Card className="shadow-md">
         <CardHeader><CardTitle>Nueva Categoría</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nombre</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Bebidas Frías" />
+            <Label>Nombre de la Categoría</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Bebidas Frías" className="h-11" />
           </div>
           <div className="space-y-2">
             <Label>Color de Identificación</Label>
-            <Input type="color" value={color} onChange={e => setColor(e.target.value)} className="h-12 p-1" />
+            <Input type="color" value={color} onChange={e => setColor(e.target.value)} className="h-12 p-1 cursor-pointer" />
           </div>
-          <Button className="w-full" onClick={save}><Plus className="mr-2 h-4 w-4" /> Crear Categoría</Button>
+          <Button className="w-full h-11" onClick={save}><Plus className="mr-2 h-4 w-4" /> Crear Categoría</Button>
         </CardContent>
       </Card>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-fit">
         {categories.map(c => (
-          <Card key={c.id} style={{ borderLeft: `6px solid ${c.color}` }}>
+          <Card key={c.id} className="overflow-hidden border-l-[8px]" style={{ borderLeftColor: c.color }}>
             <CardContent className="p-4 flex justify-between items-center">
-              <span className="font-bold">{c.name}</span>
-              <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'categories', c.id!))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              <div>
+                <span className="font-bold text-lg">{c.name}</span>
+                <p className="text-[10px] text-muted-foreground">ID: {c.id?.substring(0, 5)}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'categories', c.id!))} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
             </CardContent>
           </Card>
         ))}
@@ -328,41 +376,42 @@ function ModificadoresManager({ modifiers }: { modifiers: Modifier[] }) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <Card>
+      <Card className="shadow-md">
         <CardHeader><CardTitle>Nuevo Modificador</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nombre del Grupo (Ej: Término de carne)</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} />
+            <Label>Nombre del Grupo (Ej: Término de carne o Ingrediente Extra)</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Extras" className="h-11" />
           </div>
           <div className="space-y-3">
-            <Label>Opciones y Precios Extra</Label>
+            <Label className="text-sm font-bold flex justify-between">Opciones y Precios Extra <Plus className="h-3 w-3 cursor-pointer" onClick={addOption}/></Label>
             {options.map((opt, idx) => (
-              <div key={idx} className="flex gap-2">
-                <Input placeholder="Nombre" value={opt.name} onChange={e => {
+              <div key={idx} className="flex gap-2 animate-in fade-in slide-in-from-right-2 duration-200">
+                <Input placeholder="Opción" value={opt.name} onChange={e => {
                   const n = [...options]; n[idx].name = e.target.value; setOptions(n);
-                }} />
-                <Input type="number" placeholder="Precio" className="w-24" value={opt.price} onChange={e => {
+                }} className="flex-1" />
+                <Input type="number" placeholder="+$" className="w-24" value={opt.price} onChange={e => {
                   const n = [...options]; n[idx].price = Number(e.target.value); setOptions(n);
                 }} />
               </div>
             ))}
-            <Button variant="outline" size="sm" onClick={addOption} className="w-full"><Plus className="h-4 w-4 mr-2" /> Agregar Opción</Button>
+            <Button variant="outline" size="sm" onClick={addOption} className="w-full text-xs font-bold border-dashed"><Plus className="h-3 w-3 mr-1" /> Añadir otra opción</Button>
           </div>
-          <Button className="w-full" onClick={save}>Guardar Modificador</Button>
+          <Button className="w-full h-11" onClick={save}>Guardar Grupo de Modificadores</Button>
         </CardContent>
       </Card>
-      <div className="space-y-4">
+      <div className="space-y-4 h-[600px] overflow-auto pr-2">
+        {modifiers.length === 0 && <p className="text-center text-muted-foreground py-10 opacity-50">No hay modificadores creados.</p>}
         {modifiers.map(m => (
-          <Card key={m.id}>
-            <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-lg">{m.name}</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'modifiers', m.id!))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+          <Card key={m.id} className="shadow-sm">
+            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0 border-b">
+              <CardTitle className="text-base font-bold text-primary">{m.name}</CardTitle>
+              <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'modifiers', m.id!))} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
             </CardHeader>
-            <CardContent className="pb-4">
+            <CardContent className="p-4">
               <div className="flex flex-wrap gap-2">
                 {m.options.map((o, i) => (
-                  <Badge key={i} variant="secondary">{o.name} (+${o.price})</Badge>
+                  <Badge key={i} variant="secondary" className="px-2 py-1">${o.price > 0 ? `+${o.price.toFixed(2)}` : 'Gratis'} • {o.name}</Badge>
                 ))}
               </div>
             </CardContent>
@@ -381,29 +430,29 @@ function DescuentosManager({ discounts }: { discounts: Discount[] }) {
 
   const save = async () => {
     if (!name) return;
-    await addDoc(collection(db, 'discounts'), { name, value, type });
+    await addDoc(collection(db, 'discounts'), { name, value: Number(value), type });
     setName('');
     setValue(0);
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <Card>
-        <CardHeader><CardTitle>Nuevo Descuento</CardTitle></CardHeader>
+      <Card className="shadow-md">
+        <CardHeader><CardTitle>Nueva Regla de Descuento</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Nombre del Descuento</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Amigo del Dueño" />
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Amigo de la Casa" className="h-11" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Valor</Label>
-              <Input type="number" value={value} onChange={e => setValue(Number(e.target.value))} />
+              <Input type="number" value={value} onChange={e => setValue(Number(e.target.value))} className="h-11" />
             </div>
             <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select onValueChange={(v: DiscountType) => setType(v)}>
-                <SelectTrigger><SelectValue placeholder="Porcentaje" /></SelectTrigger>
+              <Label>Tipo de Aplicación</Label>
+              <Select onValueChange={(v: DiscountType) => setType(v)} value={type}>
+                <SelectTrigger className="h-11"><SelectValue placeholder="Porcentaje" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="porcentaje">Porcentaje (%)</SelectItem>
                   <SelectItem value="monto">Cantidad Fija ($)</SelectItem>
@@ -411,18 +460,23 @@ function DescuentosManager({ discounts }: { discounts: Discount[] }) {
               </Select>
             </div>
           </div>
-          <Button className="w-full" onClick={save}>Crear Regla de Descuento</Button>
+          <Button className="w-full h-11" onClick={save}>Crear Regla de Descuento</Button>
         </CardContent>
       </Card>
       <div className="space-y-4">
+        {discounts.length === 0 && <p className="text-center text-muted-foreground py-10 opacity-50">Sin reglas de descuento.</p>}
         {discounts.map(d => (
-          <Card key={d.id}>
+          <Card key={d.id} className="border-l-4 border-l-green-500">
             <CardContent className="p-4 flex justify-between items-center">
               <div>
-                <div className="font-bold">{d.name}</div>
-                <div className="text-sm text-muted-foreground">Valor: {d.value}{d.type === 'porcentaje' ? '%' : '$'}</div>
+                <div className="font-bold text-lg">{d.name}</div>
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                    {d.type === 'porcentaje' ? `${d.value}% de descuento` : `$${d.value.toFixed(2)} de rebaja`}
+                  </Badge>
+                </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'discounts', d.id!))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'discounts', d.id!))} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
             </CardContent>
           </Card>
         ))}
