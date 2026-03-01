@@ -1,0 +1,41 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "classic-choripan",
+      "description": "Classic Choripan with Chimichurri",
+      "imageUrl": "https://picsum.photos/seed/choripan1/400/300",
+      "imageHint": "choripan sandwich"
+    },
+    {
+      "id": "cheese-choripan",
+      "description": "Choripan with melted provolone",
+      "imageUrl": "https://picsum.photos/seed/choripan2/400/300",
+      "imageHint": "grilled sausage"
+    },
+    {
+      "id": "empanada-beef",
+      "description": "Traditional beef empanada",
+      "imageUrl": "https://picsum.photos/seed/empanada1/400/300",
+      "imageHint": "empanada pastry"
+    },
+    {
+      "id": "fries",
+      "description": "Hand-cut rustic fries",
+      "imageUrl": "https://picsum.photos/seed/fries1/400/300",
+      "imageHint": "french fries"
+    },
+    {
+      "id": "malbec-wine",
+      "description": "Glass of Malbec",
+      "imageUrl": "https://picsum.photos/seed/wine1/400/300",
+      "imageHint": "red wine"
+    },
+    {
+      "id": "quilmes-beer",
+      "description": "Cold Argentine lager",
+      "imageUrl": "https://picsum.photos/seed/beer1/400/300",
+      "imageHint": "beer glass"
+    }
+  ]
+}
