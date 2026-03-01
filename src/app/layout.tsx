@@ -4,8 +4,8 @@ import './globals.css';
 import {Toaster} from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'ChoripanFlow | POS & Kitchen',
-  description: 'Effortless POS and Kitchen Management for Artisanal Flavors',
+  title: 'ChoripanFlow | POS y Cocina',
+  description: 'Gestión de POS y cocina sin esfuerzo para sabores artesanales',
 };
 
 export default function RootLayout({
@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

@@ -5,23 +5,24 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { TrendingUp, DollarSign, ShoppingBag, Users, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const SALES_DATA = [
-  { name: 'Mon', sales: 4200 },
-  { name: 'Tue', sales: 3800 },
-  { name: 'Wed', sales: 5100 },
-  { name: 'Thu', sales: 4900 },
-  { name: 'Fri', sales: 6800 },
-  { name: 'Sat', sales: 8200 },
-  { name: 'Sun', sales: 7100 },
+  { name: 'Lun', sales: 4200 },
+  { name: 'Mar', sales: 3800 },
+  { name: 'Mié', sales: 5100 },
+  { name: 'Jue', sales: 4900 },
+  { name: 'Vie', sales: 6800 },
+  { name: 'Sáb', sales: 8200 },
+  { name: 'Dom', sales: 7100 },
 ];
 
 const TOP_ITEMS = [
-  { name: 'Classic Choripán', value: 45, color: 'hsl(var(--primary))' },
-  { name: 'Provoleta Chori', value: 25, color: 'hsl(var(--accent))' },
+  { name: 'Choripán Clásico', value: 45, color: 'hsl(var(--primary))' },
+  { name: 'Choripán Provoleta', value: 25, color: 'hsl(var(--accent))' },
   { name: 'Empanadas', value: 15, color: '#F59E0B' },
-  { name: 'Rustic Fries', value: 10, color: '#3B82F6' },
-  { name: 'Others', value: 5, color: '#9CA3AF' },
+  { name: 'Papas Rústicas', value: 10, color: '#3B82F6' },
+  { name: 'Otros', value: 5, color: '#9CA3AF' },
 ];
 
 export default function AdminDashboard() {
@@ -29,30 +30,30 @@ export default function AdminDashboard() {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="bg-white border-b px-8 py-6 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Business Insights</h1>
-          <p className="text-muted-foreground">Real-time performance metrics for ChoripanFlow.</p>
+          <h1 className="text-3xl font-bold">Métricas del Negocio</h1>
+          <p className="text-muted-foreground">Rendimiento en tiempo real para ChoripanFlow.</p>
         </div>
         <div className="flex gap-4">
           <div className="bg-secondary/50 rounded-lg p-2 px-4 flex items-center gap-3">
-            <span className="text-sm font-medium">Reporting Period:</span>
-            <Badge className="bg-primary text-white">This Week</Badge>
+            <span className="text-sm font-medium">Periodo del Informe:</span>
+            <Badge className="bg-primary text-white">Esta Semana</Badge>
           </div>
         </div>
       </header>
 
       <main className="flex-1 p-8 space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard title="Total Revenue" value="$40,100" change="+12.5%" icon={<DollarSign />} positive />
-          <StatCard title="Orders Placed" value="1,248" change="+8.2%" icon={<ShoppingBag />} positive />
-          <StatCard title="Avg. Ticket" value="$32.15" change="-1.4%" icon={<TrendingUp />} positive={false} />
-          <StatCard title="Total Customers" value="842" change="+18.3%" icon={<Users />} positive />
+          <StatCard title="Ingresos Totales" value="$40,100" change="+12.5%" icon={<DollarSign />} positive />
+          <StatCard title="Pedidos Realizados" value="1,248" change="+8.2%" icon={<ShoppingBag />} positive />
+          <StatCard title="Ticket Promedio" value="$32.15" change="-1.4%" icon={<TrendingUp />} positive={false} />
+          <StatCard title="Total Clientes" value="842" change="+18.3%" icon={<Users />} positive />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Revenue Forecast</CardTitle>
-              <CardDescription>Daily revenue performance vs previous week.</CardDescription>
+              <CardTitle>Pronóstico de Ingresos</CardTitle>
+              <CardDescription>Rendimiento diario comparado con la semana anterior.</CardDescription>
             </CardHeader>
             <CardContent className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -71,8 +72,8 @@ export default function AdminDashboard() {
 
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Top Selling Items</CardTitle>
-              <CardDescription>Product category contribution to total revenue.</CardDescription>
+              <CardTitle>Productos Más Vendidos</CardTitle>
+              <CardDescription>Contribución por categoría a los ingresos totales.</CardDescription>
             </CardHeader>
             <CardContent className="h-[400px] flex items-center">
               <ResponsiveContainer width="100%" height="100%">
@@ -110,8 +111,8 @@ export default function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>The last 5 orders across all terminals.</CardDescription>
+            <CardTitle>Transacciones Recientes</CardTitle>
+            <CardDescription>Últimos 5 pedidos en todos los terminales.</CardDescription>
           </CardHeader>
           <CardContent>
              <div className="space-y-4">
@@ -122,12 +123,12 @@ export default function AdminDashboard() {
                         <ShoppingBag className="h-5 w-5" />
                       </div>
                       <div>
-                        <div className="font-bold">ORD-209{i}</div>
-                        <div className="text-xs text-muted-foreground">Today at {10 + i}:{20 + i * 5} AM</div>
+                        <div className="font-bold">PED-209{i}</div>
+                        <div className="text-xs text-muted-foreground">Hoy a las {10 + i}:{20 + i * 5} AM</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-6">
-                      <Badge variant="outline" className="text-green-600 bg-green-50 border-green-100 font-bold px-3">PAID</Badge>
+                      <Badge variant="outline" className="text-green-600 bg-green-50 border-green-100 font-bold px-3">PAGADO</Badge>
                       <div className="font-bold text-lg">${(Math.random() * 50 + 20).toFixed(2)}</div>
                     </div>
                   </div>
@@ -151,17 +152,9 @@ function StatCard({ title, value, change, icon, positive }: { title: string, val
         <div className="text-2xl font-bold">{value}</div>
         <div className={`flex items-center text-xs mt-1 ${positive ? 'text-green-600' : 'text-red-600'}`}>
           {positive ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
-          {change} from last month
+          {change} desde el mes pasado
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function Badge({ children, className }: { children: React.ReactNode, className?: string }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${className}`}>
-      {children}
-    </span>
   );
 }

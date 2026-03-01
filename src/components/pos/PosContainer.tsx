@@ -1,11 +1,11 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react';
-import { MenuItem, Order, OrderItem, Payment, OrderStatus } from '@/lib/types';
+import React, { useState } from 'react';
+import { MenuItem, Order, Payment } from '@/lib/types';
 import { INITIAL_MENU } from '@/lib/mock-data';
-import { Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -24,7 +24,7 @@ export default function PosContainer() {
   
   function createEmptyOrder(): Order {
     return {
-      id: `ORD-${Math.floor(Math.random() * 90000) + 10000}`,
+      id: `PED-${Math.floor(Math.random() * 90000) + 10000}`,
       status: 'draft',
       items: [],
       subtotal: 0,
@@ -38,7 +38,7 @@ export default function PosContainer() {
 
   const addToCart = (item: MenuItem) => {
     if (activeOrder.status !== 'draft') {
-      toast({ title: 'Order Locked', description: 'Confirmed orders cannot be modified.' });
+      toast({ title: 'Pedido Bloqueado', description: 'Los pedidos confirmados no pueden modificarse.' });
       return;
     }
 
@@ -85,28 +85,28 @@ export default function PosContainer() {
 
   const confirmOrder = () => {
     if (activeOrder.items.length === 0) {
-      toast({ title: 'Empty Cart', description: 'Add items before confirming.' });
+      toast({ title: 'Carrito Vacío', description: 'Añade productos antes de confirmar.' });
       return;
     }
     setActiveOrder(prev => ({ ...prev, status: 'confirmed' }));
-    toast({ title: 'Order Confirmed', description: 'Sent to kitchen system.' });
+    toast({ title: 'Pedido Confirmado', description: 'Enviado al sistema de cocina.' });
   };
 
   const handlePayment = (method: 'cash' | 'card' | 'transfer') => {
     const amountToPay = parseFloat(partialAmount) || (activeOrder.total - activeOrder.paidAmount);
     
     if (amountToPay <= 0 || isNaN(amountToPay)) {
-      toast({ title: 'Invalid Amount', description: 'Please enter a valid amount.' });
+      toast({ title: 'Monto Inválido', description: 'Por favor, introduce un monto válido.' });
       return;
     }
 
     if (amountToPay > (activeOrder.total - activeOrder.paidAmount) + 0.01) {
-      toast({ title: 'Overpayment', description: 'Amount exceeds total due.' });
+      toast({ title: 'Pago Excedido', description: 'El monto excede el total pendiente.' });
       return;
     }
 
     const newPayment: Payment = {
-      id: `PAY-${Date.now()}`,
+      id: `PAG-${Date.now()}`,
       amount: amountToPay,
       method,
       timestamp: Date.now()
@@ -125,9 +125,9 @@ export default function PosContainer() {
     setPartialAmount('');
     if (isFullyPaid) {
       setPaymentDialogOpen(false);
-      toast({ title: 'Payment Successful', description: 'Order fully paid and completed.' });
+      toast({ title: 'Pago Exitoso', description: 'Pedido pagado por completo y finalizado.' });
     } else {
-      toast({ title: 'Partial Payment', description: `$${amountToPay.toFixed(2)} recorded.` });
+      toast({ title: 'Pago Parcial', description: `$${amountToPay.toFixed(2)} registrado.` });
     }
   };
 
@@ -138,7 +138,7 @@ export default function PosContainer() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Left side: Menu Selection */}
+      {/* Lado izquierdo: Selección de Menú */}
       <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         <div className="flex justify-between items-center bg-white/50 backdrop-blur-sm p-4 rounded-xl border">
           <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
@@ -146,7 +146,7 @@ export default function PosContainer() {
           </h1>
           <div className="flex gap-2">
             <Badge variant="outline" className="text-sm px-3 py-1">Terminal #01</Badge>
-            <Badge variant="secondary" className="text-sm px-3 py-1">Cashier: Juan M.</Badge>
+            <Badge variant="secondary" className="text-sm px-3 py-1">Cajero: Juan M.</Badge>
           </div>
         </div>
 
@@ -180,19 +180,19 @@ export default function PosContainer() {
         </ScrollArea>
       </div>
 
-      {/* Right side: Cart & Order Actions */}
+      {/* Lado derecho: Carrito y Acciones */}
       <div className="w-96 bg-white border-l shadow-2xl flex flex-col">
         <div className="p-6 border-b flex justify-between items-center bg-muted/30">
           <div>
             <h2 className="font-bold text-lg">{activeOrder.id}</h2>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant={activeOrder.status === 'draft' ? 'secondary' : activeOrder.status === 'confirmed' ? 'default' : 'outline'}>
-                {activeOrder.status.toUpperCase()}
+                {activeOrder.status === 'draft' ? 'BORRADOR' : activeOrder.status === 'confirmed' ? 'CONFIRMADO' : 'PAGADO'}
               </Badge>
               {activeOrder.status === 'paid' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={resetAll} title="New Order">
+          <Button variant="ghost" size="icon" onClick={resetAll} title="Nuevo Pedido">
             <X className="h-5 w-5" />
           </Button>
         </div>
@@ -201,7 +201,7 @@ export default function PosContainer() {
           {activeOrder.items.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 pt-20">
               <ShoppingCart className="h-16 w-16 mb-4" />
-              <p>Your cart is empty</p>
+              <p>Tu carrito está vacío</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -209,7 +209,7 @@ export default function PosContainer() {
                 <div key={item.id} className="flex justify-between items-center group">
                   <div className="flex-1 min-w-0 pr-2">
                     <h3 className="font-semibold truncate text-sm">{item.name}</h3>
-                    <p className="text-xs text-muted-foreground">${item.priceAtOrder.toFixed(2)} / ea</p>
+                    <p className="text-xs text-muted-foreground">${item.priceAtOrder.toFixed(2)} / ud</p>
                   </div>
                   <div className="flex items-center gap-2 bg-secondary/50 rounded-lg p-1">
                     <Button 
@@ -247,7 +247,7 @@ export default function PosContainer() {
             <span>${activeOrder.subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Tax ({(TAX_RATE * 100).toFixed(0)}%)</span>
+            <span>Impuestos ({(TAX_RATE * 100).toFixed(0)}%)</span>
             <span>${activeOrder.tax.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-xl font-bold text-foreground pt-2 border-t border-border/50">
@@ -256,13 +256,13 @@ export default function PosContainer() {
           </div>
           {activeOrder.paidAmount > 0 && (
             <div className="flex justify-between text-sm font-semibold text-green-600">
-              <span>Paid</span>
+              <span>Pagado</span>
               <span>-${activeOrder.paidAmount.toFixed(2)}</span>
             </div>
           )}
           {activeOrder.total > activeOrder.paidAmount && activeOrder.paidAmount > 0 && (
             <div className="flex justify-between text-base font-bold text-accent">
-              <span>Balance Due</span>
+              <span>Saldo Pendiente</span>
               <span>${(activeOrder.total - activeOrder.paidAmount).toFixed(2)}</span>
             </div>
           )}
@@ -270,35 +270,35 @@ export default function PosContainer() {
           <div className="grid grid-cols-1 gap-3 pt-4">
             {activeOrder.status === 'draft' ? (
               <Button size="lg" className="w-full h-14 text-lg font-bold" onClick={confirmOrder}>
-                Confirm Order
+                Confirmar Pedido
               </Button>
             ) : activeOrder.status === 'confirmed' ? (
               <Button size="lg" variant="default" className="w-full h-14 text-lg font-bold bg-accent hover:bg-accent/90" onClick={() => setPaymentDialogOpen(true)}>
-                Take Payment
+                Cobrar Pago
               </Button>
             ) : (
               <Button size="lg" variant="outline" className="w-full h-14 text-lg font-bold" onClick={resetAll}>
-                New Customer
+                Siguiente Cliente
               </Button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Payment Dialog */}
+      {/* Diálogo de Pago */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Process Payment</DialogTitle>
+            <DialogTitle>Procesar Pago</DialogTitle>
             <DialogDescription>
-              Order {activeOrder.id} - Total Due: ${(activeOrder.total - activeOrder.paidAmount).toFixed(2)}
+              Pedido {activeOrder.id} - Total Pendiente: ${(activeOrder.total - activeOrder.paidAmount).toFixed(2)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Partial Amount (Empty for full balance)</label>
+              <label className="text-sm font-medium">Monto Parcial (Vacio para balance total)</label>
               <Input 
-                placeholder="Enter amount..." 
+                placeholder="Ingresar monto..." 
                 type="number" 
                 value={partialAmount} 
                 onChange={(e) => setPartialAmount(e.target.value)}
@@ -308,20 +308,20 @@ export default function PosContainer() {
             <div className="grid grid-cols-3 gap-3">
               <Button variant="outline" className="flex flex-col h-20 gap-2" onClick={() => handlePayment('cash')}>
                 <Banknote className="h-6 w-6" />
-                <span>Cash</span>
+                <span>Efectivo</span>
               </Button>
               <Button variant="outline" className="flex flex-col h-20 gap-2" onClick={() => handlePayment('card')}>
                 <CreditCard className="h-6 w-6" />
-                <span>Card</span>
+                <span>Tarjeta</span>
               </Button>
               <Button variant="outline" className="flex flex-col h-20 gap-2" onClick={() => handlePayment('transfer')}>
                 <CheckCircle2 className="h-6 w-6" />
-                <span>Transfer</span>
+                <span>Transferencia</span>
               </Button>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setPaymentDialogOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setPaymentDialogOpen(false)}>Cancelar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

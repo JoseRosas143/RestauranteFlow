@@ -6,22 +6,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 export default function Home() {
   const modules = [
     {
-      title: 'POS Terminal',
-      description: 'Manage sales, orders, and payments.',
+      title: 'Terminal POS',
+      description: 'Gestiona ventas, pedidos y pagos.',
       icon: <ShoppingCart className="h-8 w-8 text-primary" />,
       href: '/pos',
       color: 'bg-primary/10',
     },
     {
-      title: 'Kitchen Display (KDS)',
-      description: 'Monitor tickets and track food preparation.',
+      title: 'Pantalla de Cocina (KDS)',
+      description: 'Monitorea tickets y sigue la preparación.',
       icon: <Utensils className="h-8 w-8 text-accent" />,
       href: '/kds',
       color: 'bg-accent/10',
     },
     {
-      title: 'Admin Dashboard',
-      description: 'Review sales analytics and business growth.',
+      title: 'Panel de Administración',
+      description: 'Revisa métricas de ventas y crecimiento.',
       icon: <BarChart3 className="h-8 w-8 text-blue-600" />,
       href: '/admin',
       color: 'bg-blue-50',
@@ -33,7 +33,7 @@ export default function Home() {
       <div className="text-center space-y-4">
         <h1 className="text-5xl font-bold tracking-tight text-primary">ChoripanFlow</h1>
         <p className="text-xl text-muted-foreground max-w-2xl">
-          Crafting the perfect flow for your artisanal kitchen. Efficient ordering, real-time kitchen tracking, and deep insights.
+          El flujo perfecto para tu cocina artesanal. Pedidos eficientes, seguimiento en tiempo real y análisis profundo.
         </p>
       </div>
 
@@ -41,7 +41,7 @@ export default function Home() {
         {modules.map((module) => (
           <Link key={module.href} href={module.href} className="group">
             <Card className="h-full border-2 border-transparent transition-all group-hover:border-primary group-hover:shadow-xl group-hover:-translate-y-1 overflow-hidden">
-              <div className={`h-2 w-full ${module.title === 'POS Terminal' ? 'bg-primary' : module.title === 'Kitchen Display (KDS)' ? 'bg-accent' : 'bg-blue-600'}`} />
+              <div className={`h-2 w-full ${module.title === 'Terminal POS' ? 'bg-primary' : module.title === 'Pantalla de Cocina (KDS)' ? 'bg-accent' : 'bg-blue-600'}`} />
               <CardHeader>
                 <div className={`p-3 rounded-xl w-fit mb-4 ${module.color}`}>
                   {module.icon}
@@ -51,7 +51,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center text-sm font-semibold text-primary group-hover:translate-x-1 transition-transform">
-                  Enter Module <ChevronRight className="ml-1 h-4 w-4" />
+                  Entrar al Módulo <ChevronRight className="ml-1 h-4 w-4" />
                 </div>
               </CardContent>
             </Card>
@@ -60,7 +60,7 @@ export default function Home() {
       </div>
 
       <footer className="text-muted-foreground text-sm opacity-60">
-        &copy; {new Date().getFullYear()} ChoripanFlow. Built for excellence in service.
+        &copy; {new Date().getFullYear()} ChoripanFlow. Diseñado para la excelencia en el servicio.
       </footer>
     </div>
   );
