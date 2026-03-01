@@ -13,9 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Settings, Edit2, X, ImageIcon } from 'lucide-react';
+import { Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Settings, Edit2, X, ImageIcon, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, Category, Modifier, Discount, SoldBy, TpvShape, DiscountType } from '@/lib/types';
+import Link from 'next/link';
 
 export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
@@ -35,9 +36,16 @@ export default function AdminDashboard() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="bg-white border-b px-8 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">Gestión de Catálogo</h1>
-          <p className="text-muted-foreground">Configura tus artículos, categorías y reglas de venta.</p>
+        <div className="flex items-center gap-4">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold text-primary">Gestión de Catálogo</h1>
+            <p className="text-muted-foreground">Configura tus artículos, categorías y reglas de venta.</p>
+          </div>
         </div>
       </header>
 
@@ -465,13 +473,13 @@ function DescuentosManager({ discounts }: { discounts: Discount[] }) {
             </div>
             <div className="space-y-2">
               <Label>Tipo</Label>
-              <Select onValueChange={(v: DiscountType) => setType(v)} value={type}>
+              <TypeSelect onValueChange={(v: DiscountType) => setType(v)} value={type}>
                 <SelectTrigger className="h-11"><SelectValue placeholder="Porcentaje" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="porcentaje">Porcentaje (%)</SelectItem>
                   <SelectItem value="monto">Cantidad Fija ($)</SelectItem>
                 </SelectContent>
-              </Select>
+              </TypeSelect>
             </div>
           </div>
           <Button className="w-full h-11" onClick={save}>Crear Descuento</Button>
@@ -495,3 +503,6 @@ function DescuentosManager({ discounts }: { discounts: Discount[] }) {
     </div>
   );
 }
+
+// Named alias to avoid shadowing issues with local state 'type'
+const TypeSelect = Select;

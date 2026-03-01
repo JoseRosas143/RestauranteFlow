@@ -6,11 +6,12 @@ import { KitchenTicket, TicketStatus } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, CheckCircle, Flame, ChefHat, Bell, Loader2 } from 'lucide-react';
+import { Clock, CheckCircle, Flame, ChefHat, Bell, Loader2, ArrowLeft } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, doc, updateDoc, query, orderBy, where } from 'firebase/firestore';
+import Link from 'next/link';
 
 const STATUS_CONFIG = {
   new: { label: 'Nuevo', color: 'bg-blue-100 text-blue-800', icon: <Bell className="h-4 w-4" /> },
@@ -54,9 +55,16 @@ export default function KdsContainer() {
   return (
     <div className="flex flex-col h-screen bg-background">
       <header className="bg-primary p-4 text-white flex justify-between items-center shadow-lg">
-        <div className="flex items-center gap-3">
-          <ChefHat className="h-8 w-8" />
-          <h1 className="text-2xl font-bold">Pantalla de Cocina (KDS)</h1>
+        <div className="flex items-center gap-4">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 rounded-full">
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+          </Link>
+          <div className="flex items-center gap-3">
+            <ChefHat className="h-8 w-8" />
+            <h1 className="text-2xl font-bold">Pantalla de Cocina (KDS)</h1>
+          </div>
         </div>
         <div className="flex gap-4">
           <Badge className="bg-white/20 text-white border-none text-lg px-4 py-1">

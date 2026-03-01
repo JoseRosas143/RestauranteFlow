@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MenuItem, Order, Payment, OrderItem } from '@/lib/types';
-import { Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart, RefreshCw } from 'lucide-react';
+import { Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart, RefreshCw, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, addDoc, query, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy } from 'firebase/firestore';
 
 const TAX_RATE = 0.08;
 
@@ -176,9 +177,16 @@ export default function PosContainer() {
     <div className="flex h-screen overflow-hidden bg-background">
       <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         <div className="flex justify-between items-center bg-white/50 backdrop-blur-sm p-4 rounded-xl border">
-          <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
-            <ShoppingCart className="h-6 w-6" /> ChoripanFlow POS
-          </h1>
+          <div className="flex items-center gap-4">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <ArrowLeft className="h-6 w-6" />
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
+              <ShoppingCart className="h-6 w-6" /> ChoripanFlow POS
+            </h1>
+          </div>
           <div className="flex gap-2">
             <Badge variant="outline" className="text-sm px-3 py-1">Terminal #01</Badge>
             <Badge variant="secondary" className="text-sm px-3 py-1">En Línea</Badge>
@@ -193,7 +201,7 @@ export default function PosContainer() {
           ) : menuItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <p>No hay productos en el menú.</p>
-              <p className="text-sm">Agregue productos en la base de datos de Firestore.</p>
+              <p className="text-sm">Agregue productos en el panel de administración.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
