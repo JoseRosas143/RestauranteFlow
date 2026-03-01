@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Settings, Edit2, X, ImageIcon, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Settings, Edit2, X, ImageIcon, ArrowLeft, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, Category, Modifier, Discount, SoldBy, TpvShape, DiscountType } from '@/lib/types';
 import Link from 'next/link';
@@ -102,6 +102,25 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
 
   const [newItem, setNewItem] = useState<Partial<MenuItem>>(initialItemState);
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 512) { // 512KB limit for Firestore docs
+        toast({ 
+          variant: 'destructive', 
+          title: "Imagen demasiado grande", 
+          description: "Por favor, elige una imagen de menos de 500KB para asegurar el rendimiento." 
+        });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewItem({ ...newItem, image: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const saveItem = async () => {
     if (!newItem.name || newItem.price === undefined) {
       toast({ variant: 'destructive', title: "Faltan datos", description: "Nombre y precio son obligatorios." });
@@ -176,16 +195,43 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
           </div>
           
           <div className="space-y-2">
-            <Label>URL de la Foto</Label>
-            <div className="flex gap-2">
-              <Input value={newItem.image} onChange={e => setNewItem({...newItem, image: e.target.value})} placeholder="https://..." className="flex-1" />
-              <div className="h-10 w-10 border rounded flex items-center justify-center bg-muted overflow-hidden">
+            <Label>Imagen del Producto</Label>
+            <div className="flex flex-col gap-4">
+              <div className="relative h-40 w-full border-2 border-dashed rounded-xl flex items-center justify-center bg-muted overflow-hidden group">
                 {newItem.image ? (
-                  <img src={newItem.image} alt="Preview" className="w-full h-full object-cover" />
+                  <>
+                    <img src={newItem.image} alt="Preview" className="w-full h-full object-cover" />
+                    <button 
+                      onClick={() => setNewItem({...newItem, image: ''})}
+                      className="absolute top-2 right-2 bg-black/50 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </>
                 ) : (
-                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground/40">
+                    <ImageIcon className="h-12 w-12" />
+                    <span className="text-xs">Sin imagen seleccionada</span>
+                  </div>
                 )}
               </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full gap-2 h-11 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => document.getElementById('image-upload')?.click()}
+                >
+                  <Upload className="h-4 w-4" /> Subir Foto
+                </Button>
+                <input 
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold text-center">Formato: JPG/PNG • Máximo 500KB</p>
             </div>
           </div>
 
@@ -298,7 +344,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
                   <div key={item.id} className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/10 transition-colors group">
                     <div className="flex items-center gap-4">
                       {item.image ? (
-                        <div className="w-12 h-12 rounded-lg overflow-hidden border">
+                        <div className="w-12 h-12 rounded-lg overflow-hidden border bg-muted">
                           <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                         </div>
                       ) : (
