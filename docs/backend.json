@@ -1,0 +1,59 @@
+
+{
+  "entities": {
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Un producto disponible en el menú del restaurante.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "image": { "type": "string" }
+      },
+      "required": ["name", "price", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Un pedido realizado por un cliente.",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["draft", "confirmed", "paid"] },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "tax": { "type": "number" },
+        "total": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "createdAt": { "type": "number" }
+      }
+    },
+    "KitchenTicket": {
+      "title": "KitchenTicket",
+      "description": "Un ticket para la preparación en cocina.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "status": { "type": "string", "enum": ["new", "preparing", "ready", "served"] },
+        "items": { "type": "array" },
+        "timestamp": { "type": "number" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["google.com"]
+  },
+  "firestore": {
+    "/menu/{itemId}": {
+      "schema": "MenuItem",
+      "description": "Colección de productos del menú."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Colección de pedidos de clientes."
+    },
+    "/tickets/{ticketId}": {
+      "schema": "KitchenTicket",
+      "description": "Colección de tickets de cocina."
+    }
+  }
+}
