@@ -3,7 +3,7 @@ export type OrderStatus = 'draft' | 'confirmed' | 'paid';
 export type TicketStatus = 'new' | 'preparing' | 'ready' | 'served';
 
 export interface MenuItem {
-  id: string;
+  id?: string;
   name: string;
   price: number;
   category: string;
@@ -27,6 +27,7 @@ export interface Payment {
 
 export interface Order {
   id: string;
+  firestoreId?: string;
   status: OrderStatus;
   items: OrderItem[];
   subtotal: number;
@@ -38,8 +39,9 @@ export interface Order {
 }
 
 export interface KitchenTicket {
-  id: string;
+  id?: string;
   orderId: string;
+  firestoreOrderId?: string;
   status: TicketStatus;
   items: { name: string; quantity: number }[];
   timestamp: number;

@@ -1,9 +1,9 @@
+
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { MenuItem, Order, Payment } from '@/lib/types';
-import { INITIAL_MENU } from '@/lib/mock-data';
-import { Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart } from 'lucide-react';
+import { MenuItem, Order, Payment, OrderItem } from '@/lib/types';
+import { Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,12 +12,18 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import Image from 'next/image';
+import { useFirestore, useCollection } from '@/firebase';
+import { collection, addDoc, query, orderBy, limit } from 'firebase/firestore';
 
 const TAX_RATE = 0.08;
 
 export default function PosContainer() {
+  const db = useFirestore();
+  const { data: menuItems, loading: menuLoading } = useCollection<MenuItem>(
+    query(collection(db, 'menu'), orderBy('name', 'asc'))
+  );
+
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
-  const [menu] = useState<MenuItem[]>(INITIAL_MENU);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [partialAmount, setPartialAmount] = useState<string>('');
   const [mounted, setMounted] = useState(false);
@@ -58,7 +64,7 @@ export default function PosContainer() {
       } else {
         newItems = [...prev.items, {
           id: `OI-${Date.now()}`,
-          menuItemId: item.id,
+          menuItemId: item.id!,
           name: item.name,
           quantity: 1,
           priceAtOrder: item.price
@@ -90,26 +96,43 @@ export default function PosContainer() {
     return { ...order, subtotal, tax, total };
   };
 
-  const confirmOrder = () => {
+  const confirmOrder = async () => {
     if (!activeOrder || activeOrder.items.length === 0) {
       toast({ title: 'Carrito Vacío', description: 'Añade productos antes de confirmar.' });
       return;
     }
-    setActiveOrder(prev => prev ? ({ ...prev, status: 'confirmed' }) : null);
-    toast({ title: 'Pedido Confirmado', description: 'Enviado al sistema de cocina.' });
+
+    try {
+      // Guardar pedido en Firestore
+      const orderRef = await addDoc(collection(db, 'orders'), {
+        ...activeOrder,
+        status: 'confirmed',
+        createdAt: Date.now()
+      });
+
+      // Crear ticket para cocina
+      await addDoc(collection(db, 'tickets'), {
+        orderId: activeOrder.id,
+        firestoreOrderId: orderRef.id,
+        status: 'new',
+        items: activeOrder.items.map(i => ({ name: i.name, quantity: i.quantity })),
+        timestamp: Date.now()
+      });
+
+      setActiveOrder(prev => prev ? ({ ...prev, status: 'confirmed' }) : null);
+      toast({ title: 'Pedido Confirmado', description: 'Enviado al sistema de cocina.' });
+    } catch (error) {
+      console.error("Error confirmando pedido:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el pedido.' });
+    }
   };
 
-  const handlePayment = (method: 'cash' | 'card' | 'transfer') => {
+  const handlePayment = async (method: 'cash' | 'card' | 'transfer') => {
     if (!activeOrder) return;
     const amountToPay = parseFloat(partialAmount) || (activeOrder.total - activeOrder.paidAmount);
     
     if (amountToPay <= 0 || isNaN(amountToPay)) {
       toast({ title: 'Monto Inválido', description: 'Por favor, introduce un monto válido.' });
-      return;
-    }
-
-    if (amountToPay > (activeOrder.total - activeOrder.paidAmount) + 0.01) {
-      toast({ title: 'Pago Excedido', description: 'El monto excede el total pendiente.' });
       return;
     }
 
@@ -147,13 +170,10 @@ export default function PosContainer() {
     setPaymentDialogOpen(false);
   };
 
-  if (!mounted || !activeOrder) {
-    return <div className="flex h-screen items-center justify-center bg-background text-primary font-bold">Cargando Terminal...</div>;
-  }
+  if (!mounted) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Lado izquierdo: Selección de Menú */}
       <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         <div className="flex justify-between items-center bg-white/50 backdrop-blur-sm p-4 rounded-xl border">
           <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
@@ -161,56 +181,65 @@ export default function PosContainer() {
           </h1>
           <div className="flex gap-2">
             <Badge variant="outline" className="text-sm px-3 py-1">Terminal #01</Badge>
-            <Badge variant="secondary" className="text-sm px-3 py-1">Cajero: Juan M.</Badge>
+            <Badge variant="secondary" className="text-sm px-3 py-1">En Línea</Badge>
           </div>
         </div>
 
         <ScrollArea className="flex-1 pr-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
-            {menu.map((item) => (
-              <Card 
-                key={item.id} 
-                className="cursor-pointer hover:shadow-lg transition-all group overflow-hidden border-2 border-transparent active:border-primary"
-                onClick={() => addToCart(item)}
-              >
-                <div className="relative h-32 w-full overflow-hidden">
-                  {item.image ? (
-                    <Image 
-                      src={item.image} 
-                      alt={item.name} 
-                      fill 
-                      className="object-cover group-hover:scale-105 transition-transform" 
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                      <ShoppingCart className="h-8 w-8 text-muted-foreground opacity-20" />
+          {menuLoading ? (
+            <div className="flex h-full items-center justify-center">
+              <RefreshCw className="h-8 w-8 animate-spin text-primary opacity-20" />
+            </div>
+          ) : menuItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+              <p>No hay productos en el menú.</p>
+              <p className="text-sm">Agregue productos en la base de datos de Firestore.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+              {menuItems.map((item) => (
+                <Card 
+                  key={item.id} 
+                  className="cursor-pointer hover:shadow-lg transition-all group overflow-hidden border-2 border-transparent active:border-primary"
+                  onClick={() => addToCart(item)}
+                >
+                  <div className="relative h-32 w-full overflow-hidden">
+                    {item.image ? (
+                      <Image 
+                        src={item.image} 
+                        alt={item.name} 
+                        fill 
+                        className="object-cover group-hover:scale-105 transition-transform" 
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <ShoppingCart className="h-8 w-8 text-muted-foreground opacity-20" />
+                      </div>
+                    )}
+                    <div className="absolute top-2 right-2">
+                      <Badge className="bg-primary/90 text-white font-bold border-none shadow-md">
+                        ${item.price.toFixed(2)}
+                      </Badge>
                     </div>
-                  )}
-                  <div className="absolute top-2 right-2">
-                    <Badge className="bg-primary/90 text-white font-bold border-none shadow-md">
-                      ${item.price.toFixed(2)}
-                    </Badge>
                   </div>
-                </div>
-                <CardHeader className="p-3">
-                  <CardTitle className="text-base truncate">{item.name}</CardTitle>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
+                  <CardHeader className="p-3">
+                    <CardTitle className="text-base truncate">{item.name}</CardTitle>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </div>
 
-      {/* Lado derecho: Carrito y Acciones */}
       <div className="w-96 bg-white border-l shadow-2xl flex flex-col">
         <div className="p-6 border-b flex justify-between items-center bg-muted/30">
           <div>
-            <h2 className="font-bold text-lg">{activeOrder.id}</h2>
+            <h2 className="font-bold text-lg">{activeOrder?.id}</h2>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant={activeOrder.status === 'draft' ? 'secondary' : activeOrder.status === 'confirmed' ? 'default' : 'outline'}>
-                {activeOrder.status === 'draft' ? 'BORRADOR' : activeOrder.status === 'confirmed' ? 'CONFIRMADO' : 'PAGADO'}
+              <Badge variant={activeOrder?.status === 'draft' ? 'secondary' : activeOrder?.status === 'confirmed' ? 'default' : 'outline'}>
+                {activeOrder?.status === 'draft' ? 'BORRADOR' : activeOrder?.status === 'confirmed' ? 'CONFIRMADO' : 'PAGADO'}
               </Badge>
-              {activeOrder.status === 'paid' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={resetAll} title="Nuevo Pedido">
@@ -219,7 +248,7 @@ export default function PosContainer() {
         </div>
 
         <ScrollArea className="flex-1 p-4">
-          {activeOrder.items.length === 0 ? (
+          {!activeOrder || activeOrder.items.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 pt-20">
               <ShoppingCart className="h-16 w-16 mb-4" />
               <p>Tu carrito está vacío</p>
@@ -265,35 +294,29 @@ export default function PosContainer() {
         <div className="p-6 bg-muted/30 space-y-3 border-t">
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Subtotal</span>
-            <span>${activeOrder.subtotal.toFixed(2)}</span>
+            <span>${activeOrder?.subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Impuestos ({(TAX_RATE * 100).toFixed(0)}%)</span>
-            <span>${activeOrder.tax.toFixed(2)}</span>
+            <span>${activeOrder?.tax.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-xl font-bold text-foreground pt-2 border-t border-border/50">
             <span>Total</span>
-            <span className="text-primary">${activeOrder.total.toFixed(2)}</span>
+            <span className="text-primary">${activeOrder?.total.toFixed(2)}</span>
           </div>
-          {activeOrder.paidAmount > 0 && (
+          {activeOrder && activeOrder.paidAmount > 0 && (
             <div className="flex justify-between text-sm font-semibold text-green-600">
               <span>Pagado</span>
               <span>-${activeOrder.paidAmount.toFixed(2)}</span>
             </div>
           )}
-          {activeOrder.total > activeOrder.paidAmount && activeOrder.paidAmount > 0 && (
-            <div className="flex justify-between text-base font-bold text-accent">
-              <span>Saldo Pendiente</span>
-              <span>${(activeOrder.total - activeOrder.paidAmount).toFixed(2)}</span>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 gap-3 pt-4">
-            {activeOrder.status === 'draft' ? (
+            {activeOrder?.status === 'draft' ? (
               <Button size="lg" className="w-full h-14 text-lg font-bold" onClick={confirmOrder}>
                 Confirmar Pedido
               </Button>
-            ) : activeOrder.status === 'confirmed' ? (
+            ) : activeOrder?.status === 'confirmed' ? (
               <Button size="lg" variant="default" className="w-full h-14 text-lg font-bold bg-accent hover:bg-accent/90" onClick={() => setPaymentDialogOpen(true)}>
                 Cobrar Pago
               </Button>
@@ -306,13 +329,12 @@ export default function PosContainer() {
         </div>
       </div>
 
-      {/* Diálogo de Pago */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Procesar Pago</DialogTitle>
             <DialogDescription>
-              Pedido {activeOrder.id} - Total Pendiente: ${(activeOrder.total - activeOrder.paidAmount).toFixed(2)}
+              Pedido {activeOrder?.id} - Pendiente: ${(activeOrder ? activeOrder.total - activeOrder.paidAmount : 0).toFixed(2)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
@@ -337,7 +359,7 @@ export default function PosContainer() {
               </Button>
               <Button variant="outline" className="flex flex-col h-20 gap-2" onClick={() => handlePayment('transfer')}>
                 <CheckCircle2 className="h-6 w-6" />
-                <span>Transferencia</span>
+                <span>Transf.</span>
               </Button>
             </div>
           </div>
