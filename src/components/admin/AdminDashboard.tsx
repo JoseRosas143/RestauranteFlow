@@ -12,17 +12,14 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, query, limit, getDocs, writeBatch } from 'firebase/firestore';
-import { Plus, Trash2, Package, Tag, Layers, Percent, Database, Loader2, Save, Settings } from 'lucide-react';
+import { collection, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Settings, Edit2, X, ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, Category, Modifier, Discount, SoldBy, TpvShape, DiscountType } from '@/lib/types';
-import { INITIAL_MENU } from '@/lib/mock-data';
 
 export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
   const db = useFirestore();
-  const { toast } = useToast();
 
   const { data: items } = useCollection<MenuItem>(collection(db, 'menu'));
   const { data: categories } = useCollection<Category>(collection(db, 'categories'));
@@ -33,65 +30,6 @@ export default function AdminDashboard() {
     setMounted(true);
   }, []);
 
-  const seedData = async () => {
-    if (isSeeding) return;
-    setIsSeeding(true);
-    try {
-      const menuRef = collection(db, 'menu');
-      const snap = await getDocs(query(menuRef, limit(1)));
-      
-      const batch = writeBatch(db);
-
-      // 1. Crear Categorías base
-      const defaultCats = [
-        { name: 'Sándwiches', color: '#B8732E' },
-        { name: 'Entradas', color: '#DD3C3C' },
-        { name: 'Bebidas', color: '#7C3AED' },
-        { name: 'Acompañamientos', color: '#10B981' }
-      ];
-
-      for (const cat of defaultCats) {
-        const catRef = doc(collection(db, 'categories'));
-        batch.set(catRef, cat);
-      }
-
-      // 2. Cargar Menú Inicial
-      for (const item of INITIAL_MENU) {
-        const itemRef = doc(collection(db, 'menu'));
-        batch.set(itemRef, {
-          ...item,
-          price: Number(item.price),
-          cost: Number(item.cost || 0),
-          inventoryCount: item.trackInventory ? Number(item.inventoryCount || 0) : 0,
-          createdAt: Date.now()
-        });
-      }
-
-      // 3. Modificadores iniciales
-      const modRef = doc(collection(db, 'modifiers'));
-      batch.set(modRef, {
-        name: 'Ingredientes Extra',
-        options: [
-          { name: 'Huevo frito', price: 1.5 },
-          { name: 'Queso extra', price: 2.0 },
-          { name: 'Cebolla caramelizada', price: 1.0 }
-        ]
-      });
-
-      await batch.commit();
-      toast({ title: "¡Éxito!", description: "Catálogo inicial cargado correctamente en Firebase." });
-    } catch (error: any) {
-      console.error("Error seeding data:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Error de conexión", 
-        description: error.message || "No se pudieron guardar los datos en Firestore." 
-      });
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
   if (!mounted) return null;
 
   return (
@@ -101,10 +39,6 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold text-primary">Gestión de Catálogo</h1>
           <p className="text-muted-foreground">Configura tus artículos, categorías y reglas de venta.</p>
         </div>
-        <Button variant="outline" onClick={seedData} disabled={isSeeding} className="border-primary text-primary hover:bg-primary/5">
-          {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
-          Cargar Catálogo Inicial
-        </Button>
       </header>
 
       <main className="flex-1 p-8">
@@ -141,7 +75,9 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
   const db = useFirestore();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [newItem, setNewItem] = useState<Partial<MenuItem>>({
+  const [editingId, setEditingId] = useState<string | null>(null);
+  
+  const initialItemState: Partial<MenuItem> = {
     name: '',
     price: 0,
     cost: 0,
@@ -152,8 +88,11 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
     tpvColor: '#B8732E',
     tpvShape: 'cuadrado',
     reference: '',
-    barcode: ''
-  });
+    barcode: '',
+    image: ''
+  };
+
+  const [newItem, setNewItem] = useState<Partial<MenuItem>>(initialItemState);
 
   const saveItem = async () => {
     if (!newItem.name || newItem.price === undefined) {
@@ -162,20 +101,41 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
     }
     setLoading(true);
     try {
-      await addDoc(collection(db, 'menu'), {
+      const itemData = {
         ...newItem,
         price: Number(newItem.price),
         cost: Number(newItem.cost || 0),
         inventoryCount: newItem.trackInventory ? Number(newItem.inventoryCount || 0) : 0,
-        createdAt: Date.now()
-      });
-      toast({ title: "Artículo Guardado", description: `${newItem.name} se agregó al catálogo.` });
-      setNewItem({ name: '', price: 0, cost: 0, category: '', soldBy: 'unidad', trackInventory: false, tpvColor: '#B8732E', tpvShape: 'cuadrado', reference: '', barcode: '' });
+        updatedAt: Date.now()
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, 'menu', editingId), itemData);
+        toast({ title: "Artículo Actualizado", description: `${newItem.name} se guardó correctamente.` });
+      } else {
+        await addDoc(collection(db, 'menu'), {
+          ...itemData,
+          createdAt: Date.now()
+        });
+        toast({ title: "Artículo Guardado", description: `${newItem.name} se agregó al catálogo.` });
+      }
+      resetForm();
     } catch (e) {
-      toast({ variant: 'destructive', title: "Error al guardar", description: "Verifica los permisos de Firestore." });
+      toast({ variant: 'destructive', title: "Error al guardar", description: "Hubo un problema al conectar con Firestore." });
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setNewItem(initialItemState);
+    setEditingId(null);
+  };
+
+  const startEdit = (item: MenuItem) => {
+    setNewItem(item);
+    setEditingId(item.id!);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const deleteItem = async (id: string) => {
@@ -190,15 +150,37 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <Card className="lg:col-span-1 shadow-md border-primary/20">
-        <CardHeader className="bg-primary/5 border-b mb-4">
-          <CardTitle className="text-xl">Nuevo Artículo</CardTitle>
-          <CardDescription>Crea un producto para tu terminal de venta.</CardDescription>
+        <CardHeader className="bg-primary/5 border-b mb-4 flex flex-row justify-between items-center">
+          <div>
+            <CardTitle className="text-xl">{editingId ? 'Editar Artículo' : 'Nuevo Artículo'}</CardTitle>
+            <CardDescription>{editingId ? 'Modifica los datos del producto' : 'Crea un producto para tu terminal de venta.'}</CardDescription>
+          </div>
+          {editingId && (
+            <Button variant="ghost" size="icon" onClick={resetForm}>
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Nombre del Plato/Bebida</Label>
             <Input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="Ej: Choripán Especial" className="h-11" />
           </div>
+          
+          <div className="space-y-2">
+            <Label>URL de la Foto</Label>
+            <div className="flex gap-2">
+              <Input value={newItem.image} onChange={e => setNewItem({...newItem, image: e.target.value})} placeholder="https://..." className="flex-1" />
+              <div className="h-10 w-10 border rounded flex items-center justify-center bg-muted overflow-hidden">
+                {newItem.image ? (
+                  <img src={newItem.image} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Categoría</Label>
@@ -273,10 +255,17 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
               </div>
             </div>
           </div>
-          <Button className="w-full mt-4 h-12 text-lg font-bold" onClick={saveItem} disabled={loading}>
-            {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-            Guardar Artículo
-          </Button>
+          <div className="flex gap-2 pt-4">
+            {editingId && (
+              <Button variant="outline" className="flex-1 h-12" onClick={resetForm}>
+                Cancelar
+              </Button>
+            )}
+            <Button className="flex-[2] h-12 text-lg font-bold" onClick={saveItem} disabled={loading}>
+              {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+              {editingId ? 'Guardar Cambios' : 'Guardar Artículo'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -293,24 +282,30 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
             {items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground opacity-50 border-2 border-dashed rounded-xl">
                 <Package className="h-12 w-12 mb-2" />
-                <p>No hay artículos. Usa el botón de carga inicial o crea uno.</p>
+                <p>No hay artículos registrados todavía.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {items.map(item => (
                   <div key={item.id} className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/10 transition-colors group">
                     <div className="flex items-center gap-4">
-                      <div 
-                        className="w-12 h-12 shadow-sm border flex items-center justify-center text-white font-black text-xl"
-                        style={{ 
-                          backgroundColor: item.tpvColor || '#B8732E', 
-                          borderRadius: item.tpvShape === 'circulo' ? '50%' : item.tpvShape === 'hexágono' ? '12px' : '8px' 
-                        }}
-                      >
-                        {item.name[0]}
-                      </div>
+                      {item.image ? (
+                        <div className="w-12 h-12 rounded-lg overflow-hidden border">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div 
+                          className="w-12 h-12 shadow-sm border flex items-center justify-center text-white font-black text-xl"
+                          style={{ 
+                            backgroundColor: item.tpvColor || '#B8732E', 
+                            borderRadius: item.tpvShape === 'circulo' ? '50%' : item.tpvShape === 'hexágono' ? '12px' : '8px' 
+                          }}
+                        >
+                          {item.name[0]}
+                        </div>
+                      )}
                       <div>
-                        <div className="font-bold text-base">{item.name}</div>
+                        <div className="font-bold text-base truncate max-w-[150px]">{item.name}</div>
                         <div className="text-xs text-muted-foreground flex items-center gap-2">
                           <span className="font-semibold text-primary">{item.category}</span>
                           <span>•</span>
@@ -318,9 +313,14 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
                         </div>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id!)} className="text-destructive group-hover:opacity-100 opacity-0 transition-opacity">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" onClick={() => startEdit(item)} className="text-primary">
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id!)} className="text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
