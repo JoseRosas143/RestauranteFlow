@@ -3,73 +3,44 @@
   "entities": {
     "MenuItem": {
       "title": "MenuItem",
-      "description": "Un producto disponible en el menú con detalles de inventario y TPV.",
+      "description": "Producto del menú con soporte para modificadores e inventario.",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
         "price": { "type": "number" },
         "cost": { "type": "number" },
         "category": { "type": "string" },
-        "categoryId": { "type": "string" },
-        "image": { "type": "string" },
-        "soldBy": { "type": "string", "enum": ["unidad", "peso"] },
-        "reference": { "type": "string" },
-        "barcode": { "type": "string" },
-        "trackInventory": { "type": "boolean" },
-        "inventoryCount": { "type": "number" },
+        "modifiers": { "type": "array", "items": { "type": "string" } },
         "tpvColor": { "type": "string" },
-        "tpvShape": { "type": "string", "enum": ["cuadrado", "circulo", "hexágono"] },
-        "modifiers": { "type": "array" }
-      },
-      "required": ["name", "price", "soldBy", "trackInventory"]
-    },
-    "Category": {
-      "title": "Category",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "color": { "type": "string" }
+        "tpvShape": { "type": "string" }
       }
     },
-    "Modifier": {
-      "title": "Modifier",
+    "Customer": {
+      "title": "Customer",
+      "description": "Perfil de cliente para sistema de lealtad.",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
-        "options": { "type": "array" }
-      }
-    },
-    "Discount": {
-      "title": "Discount",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "value": { "type": "number" },
-        "type": { "type": "string", "enum": ["porcentaje", "monto"] }
+        "points": { "type": "number" },
+        "totalVisits": { "type": "number" },
+        "lastVisit": { "type": "number" }
       }
     },
     "Order": {
       "title": "Order",
       "type": "object",
       "properties": {
-        "status": { "type": "string", "enum": ["draft", "confirmed", "paid"] },
+        "status": { "type": "string", "enum": ["draft", "open", "confirmed", "paid"] },
+        "serviceType": { "type": "string", "enum": ["mesa", "llevar", "domicilio", "rappi", "ubereats", "didifood"] },
         "items": { "type": "array" },
-        "subtotal": { "type": "number" },
-        "tax": { "type": "number" },
         "total": { "type": "number" },
-        "paidAmount": { "type": "number" },
-        "createdAt": { "type": "number" }
+        "customerId": { "type": "string" }
       }
     }
   },
-  "auth": {
-    "providers": ["google.com"]
-  },
   "firestore": {
     "/menu/{itemId}": { "schema": "MenuItem" },
-    "/categories/{catId}": { "schema": "Category" },
-    "/modifiers/{modId}": { "schema": "Modifier" },
-    "/discounts/{discId}": { "schema": "Discount" },
+    "/customers/{customerId}": { "schema": "Customer" },
     "/orders/{orderId}": { "schema": "Order" },
     "/tickets/{ticketId}": { "schema": "KitchenTicket" }
   }

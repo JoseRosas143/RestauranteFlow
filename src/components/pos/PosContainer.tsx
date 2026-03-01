@@ -2,8 +2,11 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { MenuItem, Order, Payment, OrderItem } from '@/lib/types';
-import { Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart, RefreshCw, ArrowLeft } from 'lucide-react';
+import { MenuItem, Order, Payment, OrderItem, ServiceType, Modifier, ModifierOption, Customer, Discount } from '@/lib/types';
+import { 
+  Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart, 
+  RefreshCw, ArrowLeft, User, MapPin, Tag, MessageSquare, Save, Wallet, Search 
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,10 +14,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import Image from 'next/image';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, addDoc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 
 const TAX_RATE = 0.08;
 
@@ -23,12 +28,23 @@ export default function PosContainer() {
   const { data: menuItems, loading: menuLoading } = useCollection<MenuItem>(
     query(collection(db, 'menu'), orderBy('name', 'asc'))
   );
+  const { data: modifiersData } = useCollection<Modifier>(collection(db, 'modifiers'));
+  const { data: customersData } = useCollection<Customer>(collection(db, 'customers'));
+  const { data: discountsData } = useCollection<Discount>(collection(db, 'discounts'));
 
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [partialAmount, setPartialAmount] = useState<string>('');
   const [mounted, setMounted] = useState(false);
   
+  // Dialog States
+  const [modifierDialogOpen, setModifierDialogOpen] = useState(false);
+  const [selectedItemForMod, setSelectedItemForMod] = useState<MenuItem | null>(null);
+  const [tempModifiers, setTempModifiers] = useState<ModifierOption[]>([]);
+  const [tempNotes, setTempNotes] = useState('');
+  
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [partialAmount, setPartialAmount] = useState<string>('');
+
   function createEmptyOrder(): Order {
     return {
       id: `PED-${Math.floor(Math.random() * 90000) + 10000}`,
@@ -37,8 +53,11 @@ export default function PosContainer() {
       subtotal: 0,
       tax: 0,
       total: 0,
+      discountAmount: 0,
       payments: [],
       paidAmount: 0,
+      serviceType: 'mesa',
+      tableNumber: '1',
       createdAt: Date.now(),
     };
   }
@@ -48,31 +67,43 @@ export default function PosContainer() {
     setActiveOrder(createEmptyOrder());
   }, []);
 
-  const addToCart = (item: MenuItem) => {
-    if (!activeOrder || activeOrder.status !== 'draft') {
-      toast({ title: 'Pedido Bloqueado', description: 'Los pedidos confirmados no pueden modificarse.' });
-      return;
-    }
+  const openModifierDialog = (item: MenuItem) => {
+    if (activeOrder?.status !== 'draft') return;
+    setSelectedItemForMod(item);
+    setTempModifiers([]);
+    setTempNotes('');
+    setModifierDialogOpen(true);
+  };
+
+  const toggleModifier = (opt: ModifierOption) => {
+    setTempModifiers(prev => 
+      prev.find(p => p.name === opt.name) 
+        ? prev.filter(p => p.name !== opt.name)
+        : [...prev, opt]
+    );
+  };
+
+  const confirmAddToCart = () => {
+    if (!selectedItemForMod || !activeOrder) return;
+
+    const newItem: OrderItem = {
+      id: `OI-${Date.now()}`,
+      menuItemId: selectedItemForMod.id!,
+      name: selectedItemForMod.name,
+      quantity: 1,
+      priceAtOrder: selectedItemForMod.price,
+      selectedModifiers: [...tempModifiers],
+      notes: tempNotes
+    };
 
     setActiveOrder(prev => {
       if (!prev) return null;
-      const existing = prev.items.find(i => i.menuItemId === item.id);
-      let newItems;
-      if (existing) {
-        newItems = prev.items.map(i => 
-          i.menuItemId === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      } else {
-        newItems = [...prev.items, {
-          id: `OI-${Date.now()}`,
-          menuItemId: item.id!,
-          name: item.name,
-          quantity: 1,
-          priceAtOrder: item.price
-        }];
-      }
+      const newItems = [...prev.items, newItem];
       return updateOrderTotals({ ...prev, items: newItems });
     });
+
+    setModifierDialogOpen(false);
+    toast({ title: 'Agregado', description: `${selectedItemForMod.name} con extras.` });
   };
 
   const updateQuantity = (itemId: string, delta: number) => {
@@ -81,8 +112,7 @@ export default function PosContainer() {
       if (!prev) return null;
       const newItems = prev.items.map(i => {
         if (i.id === itemId) {
-          const newQty = Math.max(0, i.quantity + delta);
-          return { ...i, quantity: newQty };
+          return { ...i, quantity: Math.max(0, i.quantity + delta) };
         }
         return i;
       }).filter(i => i.quantity > 0);
@@ -91,40 +121,75 @@ export default function PosContainer() {
   };
 
   const updateOrderTotals = (order: Order): Order => {
-    const subtotal = order.items.reduce((acc, item) => acc + (item.priceAtOrder * item.quantity), 0);
-    const tax = subtotal * TAX_RATE;
-    const total = subtotal + tax;
+    const subtotal = order.items.reduce((acc, item) => {
+      const modsPrice = item.selectedModifiers.reduce((mAcc, m) => mAcc + m.price, 0);
+      return acc + ((item.priceAtOrder + modsPrice) * item.quantity);
+    }, 0);
+    
+    // Simplificación de motor de descuentos (se puede expandir)
+    const discount = order.discountAmount || 0;
+    const tax = (subtotal - discount) * TAX_RATE;
+    const total = subtotal - discount + tax;
+    
     return { ...order, subtotal, tax, total };
   };
 
-  const confirmOrder = async () => {
-    if (!activeOrder || activeOrder.items.length === 0) {
-      toast({ title: 'Carrito Vacío', description: 'Añade productos antes de confirmar.' });
-      return;
+  const applyDiscount = (d: Discount) => {
+    if (!activeOrder) return;
+    let amount = 0;
+    if (d.type === 'porcentaje') {
+      amount = activeOrder.subtotal * (d.value / 100);
+    } else {
+      amount = d.value;
     }
+    setActiveOrder(prev => prev ? updateOrderTotals({ ...prev, discountAmount: amount }) : null);
+    toast({ title: 'Descuento Aplicado', description: d.name });
+  };
 
+  const saveTicketOpen = async () => {
+    if (!activeOrder || activeOrder.items.length === 0) return;
     try {
-      // Guardar pedido en Firestore
+      const orderData = { ...activeOrder, status: 'open', updatedAt: Date.now() };
+      if (activeOrder.firestoreId) {
+        await updateDoc(doc(db, 'orders', activeOrder.firestoreId), orderData);
+      } else {
+        const docRef = await addDoc(collection(db, 'orders'), orderData);
+        setActiveOrder({ ...orderData, firestoreId: docRef.id });
+      }
+      toast({ title: 'Ticket Guardado', description: 'Pedido en estado abierto.' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error al guardar' });
+    }
+  };
+
+  const confirmToKitchen = async () => {
+    if (!activeOrder || activeOrder.items.length === 0) return;
+    try {
       const orderRef = await addDoc(collection(db, 'orders'), {
         ...activeOrder,
         status: 'confirmed',
         createdAt: Date.now()
       });
 
-      // Crear ticket para cocina
       await addDoc(collection(db, 'tickets'), {
         orderId: activeOrder.id,
         firestoreOrderId: orderRef.id,
         status: 'new',
-        items: activeOrder.items.map(i => ({ name: i.name, quantity: i.quantity })),
+        items: activeOrder.items.map(i => ({ 
+          name: i.name, 
+          quantity: i.quantity,
+          modifiers: i.selectedModifiers.map(m => m.name),
+          notes: i.notes
+        })),
+        serviceType: activeOrder.serviceType,
+        tableNumber: activeOrder.tableNumber,
         timestamp: Date.now()
       });
 
-      setActiveOrder(prev => prev ? ({ ...prev, status: 'confirmed' }) : null);
-      toast({ title: 'Pedido Confirmado', description: 'Enviado al sistema de cocina.' });
+      setActiveOrder(prev => prev ? ({ ...prev, status: 'confirmed', firestoreId: orderRef.id }) : null);
+      toast({ title: 'Enviado a Cocina', description: 'Ticket generado correctamente.' });
     } catch (error) {
-      console.error("Error confirmando pedido:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el pedido.' });
+      toast({ variant: 'destructive', title: 'Error' });
     }
   };
 
@@ -132,11 +197,6 @@ export default function PosContainer() {
     if (!activeOrder) return;
     const amountToPay = parseFloat(partialAmount) || (activeOrder.total - activeOrder.paidAmount);
     
-    if (amountToPay <= 0 || isNaN(amountToPay)) {
-      toast({ title: 'Monto Inválido', description: 'Por favor, introduce un monto válido.' });
-      return;
-    }
-
     const newPayment: Payment = {
       id: `PAG-${Date.now()}`,
       amount: amountToPay,
@@ -146,6 +206,16 @@ export default function PosContainer() {
 
     const newPaidAmount = activeOrder.paidAmount + amountToPay;
     const isFullyPaid = newPaidAmount >= activeOrder.total - 0.01;
+
+    // Actualizar puntos de lealtad si hay cliente
+    if (isFullyPaid && activeOrder.customerId) {
+      const points = Math.floor(activeOrder.total / 10); // 1 punto cada $10
+      await updateDoc(doc(db, 'customers', activeOrder.customerId), {
+        points: increment(points),
+        totalVisits: increment(1),
+        lastVisit: Date.now()
+      });
+    }
 
     setActiveOrder(prev => {
       if (!prev) return null;
@@ -160,9 +230,7 @@ export default function PosContainer() {
     setPartialAmount('');
     if (isFullyPaid) {
       setPaymentDialogOpen(false);
-      toast({ title: 'Pago Exitoso', description: 'Pedido pagado por completo y finalizado.' });
-    } else {
-      toast({ title: 'Pago Parcial', description: `$${amountToPay.toFixed(2)} registrado.` });
+      toast({ title: 'Pago Completado' });
     }
   };
 
@@ -175,122 +243,153 @@ export default function PosContainer() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      {/* PANEL IZQUIERDO: Catálogo */}
       <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-        <div className="flex justify-between items-center bg-white/50 backdrop-blur-sm p-4 rounded-xl border">
+        <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
           <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <ArrowLeft className="h-6 w-6" />
-              </Button>
+            <Link href="/" className="p-2 hover:bg-muted rounded-full transition-colors">
+              <ArrowLeft className="h-6 w-6 text-primary" />
             </Link>
             <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
               <ShoppingCart className="h-6 w-6" /> ChoripanFlow POS
             </h1>
           </div>
-          <div className="flex gap-2">
-            <Badge variant="outline" className="text-sm px-3 py-1">Terminal #01</Badge>
-            <Badge variant="secondary" className="text-sm px-3 py-1">En Línea</Badge>
+          <div className="flex gap-4 items-center">
+            <Select 
+              value={activeOrder?.serviceType} 
+              onValueChange={(v: ServiceType) => setActiveOrder(prev => prev ? ({...prev, serviceType: v}) : null)}
+            >
+              <SelectTrigger className="w-40 h-10 font-semibold">
+                <SelectValue placeholder="Canal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mesa">🏠 Mesa</SelectItem>
+                <SelectItem value="llevar">🥡 Para Llevar</SelectItem>
+                <SelectItem value="domicilio">🛵 Domicilio</SelectItem>
+                <SelectItem value="rappi">🟠 Rappi</SelectItem>
+                <SelectItem value="ubereats">🟢 UberEats</SelectItem>
+                <SelectItem value="didifood">🔴 DidiFood</SelectItem>
+              </SelectContent>
+            </Select>
+            {activeOrder?.serviceType === 'mesa' && (
+              <Input 
+                className="w-20 text-center font-bold" 
+                placeholder="Mesa" 
+                value={activeOrder.tableNumber} 
+                onChange={e => setActiveOrder(prev => prev ? ({...prev, tableNumber: e.target.value}) : null)}
+              />
+            )}
           </div>
         </div>
 
         <ScrollArea className="flex-1 pr-4">
-          {menuLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <RefreshCw className="h-8 w-8 animate-spin text-primary opacity-20" />
-            </div>
-          ) : menuItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-              <p>No hay productos en el menú.</p>
-              <p className="text-sm">Agregue productos en el panel de administración.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
-              {menuItems.map((item) => (
-                <Card 
-                  key={item.id} 
-                  className="cursor-pointer hover:shadow-lg transition-all group overflow-hidden border-2 border-transparent active:border-primary"
-                  onClick={() => addToCart(item)}
-                >
-                  <div className="relative h-32 w-full overflow-hidden bg-muted">
-                    {item.image ? (
-                      <img 
-                        src={item.image} 
-                        alt={item.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ShoppingCart className="h-8 w-8 text-muted-foreground opacity-20" />
-                      </div>
-                    )}
-                    <div className="absolute top-2 right-2">
-                      <Badge className="bg-primary/90 text-white font-bold border-none shadow-md">
-                        ${item.price.toFixed(2)}
-                      </Badge>
-                    </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+            {menuItems.map((item) => (
+              <Card 
+                key={item.id} 
+                className="cursor-pointer hover:shadow-lg transition-all border-2 border-transparent active:border-primary overflow-hidden group"
+                onClick={() => openModifierDialog(item)}
+              >
+                <div className="relative h-32 w-full bg-muted">
+                  {item.image ? (
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center opacity-20"><ShoppingCart /></div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-primary/90 text-white font-bold border-none shadow-md">${item.price.toFixed(2)}</Badge>
                   </div>
-                  <CardHeader className="p-3">
-                    <CardTitle className="text-base truncate">{item.name}</CardTitle>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          )}
+                </div>
+                <CardHeader className="p-3">
+                  <CardTitle className="text-sm truncate font-bold">{item.name}</CardTitle>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
         </ScrollArea>
+
+        {/* Barra Inferior de Acciones Rápidas */}
+        <div className="grid grid-cols-4 gap-4 bg-white p-4 rounded-xl border shadow-md">
+          <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => setCustomerDialogOpen(true)}>
+            <User className="h-5 w-5" />
+            <span className="text-[10px] uppercase font-bold">Cliente</span>
+          </Button>
+          <Button variant="outline" className="h-16 flex-col gap-1">
+            <Tag className="h-5 w-5" />
+            <span className="text-[10px] uppercase font-bold">Descuentos</span>
+          </Button>
+          <Button variant="outline" className="h-16 flex-col gap-1" onClick={saveTicketOpen}>
+            <Save className="h-5 w-5" />
+            <span className="text-[10px] uppercase font-bold">Ticket Abierto</span>
+          </Button>
+          <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => toast({ title: "Próximamente", description: "Módulo de División de Cuenta" })}>
+            <RefreshCw className="h-5 w-5" />
+            <span className="text-[10px] uppercase font-bold">Dividir</span>
+          </Button>
+        </div>
       </div>
 
+      {/* PANEL DERECHO: Resumen Pedido */}
       <div className="w-96 bg-white border-l shadow-2xl flex flex-col">
-        <div className="p-6 border-b flex justify-between items-center bg-muted/30">
-          <div>
-            <h2 className="font-bold text-lg">{activeOrder?.id}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant={activeOrder?.status === 'draft' ? 'secondary' : activeOrder?.status === 'confirmed' ? 'default' : 'outline'}>
-                {activeOrder?.status === 'draft' ? 'BORRADOR' : activeOrder?.status === 'confirmed' ? 'CONFIRMADO' : 'PAGADO'}
-              </Badge>
+        <div className="p-6 border-b bg-muted/30">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="font-black text-xl text-primary">{activeOrder?.id}</h2>
+              <div className="flex gap-2 mt-1">
+                <Badge variant="outline" className="uppercase">{activeOrder?.serviceType}</Badge>
+                {activeOrder?.tableNumber && <Badge variant="secondary">MESA {activeOrder.tableNumber}</Badge>}
+              </div>
             </div>
+            <Button variant="ghost" size="icon" onClick={resetAll}><X className="h-5 w-5" /></Button>
           </div>
-          <Button variant="ghost" size="icon" onClick={resetAll} title="Nuevo Pedido">
-            <X className="h-5 w-5" />
-          </Button>
+          {activeOrder?.customerId && (
+            <div className="mt-4 p-2 bg-primary/5 rounded-lg border border-primary/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                <span className="text-xs font-bold">{customersData.find(c => c.id === activeOrder.customerId)?.name}</span>
+              </div>
+              <Badge className="bg-primary text-[10px]">{customersData.find(c => c.id === activeOrder.customerId)?.points} pts</Badge>
+            </div>
+          )}
         </div>
 
         <ScrollArea className="flex-1 p-4">
           {!activeOrder || activeOrder.items.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 pt-20">
-              <ShoppingCart className="h-16 w-16 mb-4" />
-              <p>Tu carrito está vacío</p>
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30 pt-20">
+              <ShoppingCart className="h-20 w-20 mb-4" />
+              <p className="font-bold">CARRITO VACÍO</p>
             </div>
           ) : (
             <div className="space-y-4">
               {activeOrder.items.map((item) => (
-                <div key={item.id} className="flex justify-between items-center group">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <h3 className="font-semibold truncate text-sm">{item.name}</h3>
-                    <p className="text-xs text-muted-foreground">${item.priceAtOrder.toFixed(2)} / ud</p>
+                <div key={item.id} className="border-b pb-4 last:border-0 group">
+                  <div className="flex justify-between items-start mb-1">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-sm leading-tight">{item.name}</h3>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {item.selectedModifiers.map((m, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-[9px] px-1 py-0">+ {m.name}</Badge>
+                        ))}
+                      </div>
+                      {item.notes && <p className="text-[10px] italic text-muted-foreground mt-1 flex items-center gap-1"><MessageSquare className="h-2 w-2" /> {item.notes}</p>}
+                    </div>
+                    <div className="text-right ml-4">
+                      <span className="font-bold text-sm">
+                        ${((item.priceAtOrder + item.selectedModifiers.reduce((a, b) => a + b.price, 0)) * item.quantity).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 bg-secondary/50 rounded-lg p-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-md"
-                      disabled={activeOrder.status !== 'draft'}
-                      onClick={() => updateQuantity(item.id, -1)}
-                    >
-                      {item.quantity === 1 ? <Trash2 className="h-3 w-3 text-destructive" /> : <Minus className="h-3 w-3" />}
-                    </Button>
-                    <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-md"
-                      disabled={activeOrder.status !== 'draft'}
-                      onClick={() => updateQuantity(item.id, 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <div className="w-20 text-right font-semibold text-sm">
-                    ${(item.priceAtOrder * item.quantity).toFixed(2)}
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2 bg-secondary/50 rounded-lg p-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.id, -1)} disabled={activeOrder.status !== 'draft'}>
+                        {item.quantity === 1 ? <Trash2 className="h-3 w-3 text-destructive" /> : <Minus className="h-3 w-3" />}
+                      </Button>
+                      <span className="w-5 text-center text-xs font-black">{item.quantity}</span>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.id, 1)} disabled={activeOrder.status !== 'draft'}>
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-medium">Unit: ${item.priceAtOrder.toFixed(2)}</span>
                   </div>
                 </div>
               ))}
@@ -298,80 +397,150 @@ export default function PosContainer() {
           )}
         </ScrollArea>
 
-        <div className="p-6 bg-muted/30 space-y-3 border-t">
-          <div className="flex justify-between text-sm text-muted-foreground">
+        <div className="p-6 bg-muted/40 space-y-3 border-t shadow-inner">
+          <div className="flex justify-between text-xs font-bold text-muted-foreground uppercase tracking-widest">
             <span>Subtotal</span>
             <span>${activeOrder?.subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Impuestos ({(TAX_RATE * 100).toFixed(0)}%)</span>
-            <span>${activeOrder?.tax.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-xl font-bold text-foreground pt-2 border-t border-border/50">
-            <span>Total</span>
-            <span className="text-primary">${activeOrder?.total.toFixed(2)}</span>
-          </div>
-          {activeOrder && activeOrder.paidAmount > 0 && (
-            <div className="flex justify-between text-sm font-semibold text-green-600">
-              <span>Pagado</span>
-              <span>-${activeOrder.paidAmount.toFixed(2)}</span>
+          {activeOrder && activeOrder.discountAmount > 0 && (
+            <div className="flex justify-between text-xs font-bold text-accent uppercase tracking-widest">
+              <span>Descuento</span>
+              <span>-${activeOrder.discountAmount.toFixed(2)}</span>
             </div>
           )}
+          <div className="flex justify-between text-2xl font-black text-foreground pt-2 border-t-2 border-primary/20">
+            <span>TOTAL</span>
+            <span className="text-primary">${activeOrder?.total.toFixed(2)}</span>
+          </div>
 
           <div className="grid grid-cols-1 gap-3 pt-4">
             {activeOrder?.status === 'draft' ? (
-              <Button size="lg" className="w-full h-14 text-lg font-bold" onClick={confirmOrder}>
-                Confirmar Pedido
+              <Button size="lg" className="w-full h-16 text-xl font-black shadow-xl" onClick={confirmToKitchen}>
+                ENVIAR A COCINA
               </Button>
-            ) : activeOrder?.status === 'confirmed' ? (
-              <Button size="lg" variant="default" className="w-full h-14 text-lg font-bold bg-accent hover:bg-accent/90" onClick={() => setPaymentDialogOpen(true)}>
-                Cobrar Pago
+            ) : activeOrder?.status === 'confirmed' || activeOrder?.status === 'open' ? (
+              <Button size="lg" variant="default" className="w-full h-16 text-xl font-black bg-accent hover:bg-accent/90 shadow-xl" onClick={() => setPaymentDialogOpen(true)}>
+                COBRAR PAGO
               </Button>
             ) : (
-              <Button size="lg" variant="outline" className="w-full h-14 text-lg font-bold" onClick={resetAll}>
-                Siguiente Cliente
+              <Button size="lg" variant="outline" className="w-full h-16 text-xl font-black" onClick={resetAll}>
+                SIGUIENTE CLIENTE
               </Button>
             )}
           </div>
         </div>
       </div>
 
+      {/* DIALOG: Modificadores y Personalización */}
+      <Dialog open={modifierDialogOpen} onOpenChange={setModifierDialogOpen}>
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
+          <div className="bg-primary p-6 text-white">
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight">{selectedItemForMod?.name}</DialogTitle>
+            <DialogDescription className="text-white/70">Personaliza tu plato con ingredientes extra</DialogDescription>
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="space-y-4">
+              <h3 className="font-black text-sm uppercase text-muted-foreground tracking-widest">Toppings & Extras</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {modifiersData.map(m => m.options.map((opt, idx) => (
+                  <Button 
+                    key={`${m.id}-${idx}`} 
+                    variant={tempModifiers.find(tm => tm.name === opt.name) ? 'default' : 'outline'}
+                    className="h-14 justify-between font-bold"
+                    onClick={() => toggleModifier(opt)}
+                  >
+                    <span>{opt.name}</span>
+                    <Badge variant="secondary" className="ml-2">+${opt.price.toFixed(2)}</Badge>
+                  </Button>
+                )))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-bold text-xs uppercase text-muted-foreground">Instrucciones de Cocina</Label>
+              <Input 
+                placeholder="Ej: Sin cebolla, término medio..." 
+                value={tempNotes} 
+                onChange={e => setTempNotes(e.target.value)}
+                className="h-12"
+              />
+            </div>
+          </div>
+          <DialogFooter className="p-6 bg-muted/50">
+            <Button variant="ghost" onClick={() => setModifierDialogOpen(false)}>Cancelar</Button>
+            <Button className="h-12 px-10 font-black text-lg" onClick={confirmAddToCart}>AGREGAR AL CARRITO</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: Clientes y Fidelización */}
+      <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Buscador de Clientes</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar por nombre o teléfono..." className="pl-10" />
+            </div>
+            <ScrollArea className="h-64 border rounded-md p-2">
+              {customersData.map(c => (
+                <div 
+                  key={c.id} 
+                  className="flex items-center justify-between p-3 border-b last:border-0 hover:bg-muted cursor-pointer rounded-lg"
+                  onClick={() => {
+                    setActiveOrder(prev => prev ? ({...prev, customerId: c.id}) : null);
+                    setCustomerDialogOpen(false);
+                  }}
+                >
+                  <div>
+                    <div className="font-bold">{c.name}</div>
+                    <div className="text-xs text-muted-foreground">Visitas: {c.totalVisits}</div>
+                  </div>
+                  <Badge variant="secondary">{c.points} pts</Badge>
+                </div>
+              ))}
+            </ScrollArea>
+            <Button variant="outline" className="w-full border-dashed"><Plus className="h-4 w-4 mr-2" /> Nuevo Cliente</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: Pago */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Procesar Pago</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase">Finalizar Venta</DialogTitle>
             <DialogDescription>
-              Pedido {activeOrder?.id} - Pendiente: ${(activeOrder ? activeOrder.total - activeOrder.paidAmount : 0).toFixed(2)}
+              Pendiente: <span className="text-primary font-bold">${(activeOrder ? activeOrder.total - activeOrder.paidAmount : 0).toFixed(2)}</span>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
+            <div className="grid grid-cols-3 gap-3">
+              <Button variant="outline" className="flex flex-col h-24 gap-2 border-2 hover:border-primary hover:bg-primary/5" onClick={() => handlePayment('cash')}>
+                <Banknote className="h-8 w-8 text-green-600" />
+                <span className="font-bold uppercase text-xs">Efectivo</span>
+              </Button>
+              <Button variant="outline" className="flex flex-col h-24 gap-2 border-2 hover:border-primary hover:bg-primary/5" onClick={() => handlePayment('card')}>
+                <CreditCard className="h-8 w-8 text-blue-600" />
+                <span className="font-bold uppercase text-xs">Tarjeta</span>
+              </Button>
+              <Button variant="outline" className="flex flex-col h-24 gap-2 border-2 hover:border-primary hover:bg-primary/5" onClick={() => handlePayment('transfer')}>
+                <Wallet className="h-8 w-8 text-purple-600" />
+                <span className="font-bold uppercase text-xs">Transferencia</span>
+              </Button>
+            </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Monto Parcial (Vacio para balance total)</label>
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">Pago Parcial</Label>
               <Input 
-                placeholder="Ingresar monto..." 
+                placeholder="Introducir monto..." 
                 type="number" 
                 value={partialAmount} 
                 onChange={(e) => setPartialAmount(e.target.value)}
-                className="text-lg h-12"
+                className="text-2xl h-14 font-black"
               />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <Button variant="outline" className="flex flex-col h-20 gap-2" onClick={() => handlePayment('cash')}>
-                <Banknote className="h-6 w-6" />
-                <span>Efectivo</span>
-              </Button>
-              <Button variant="outline" className="flex flex-col h-20 gap-2" onClick={() => handlePayment('card')}>
-                <CreditCard className="h-6 w-6" />
-                <span>Tarjeta</span>
-              </Button>
-              <Button variant="outline" className="flex flex-col h-20 gap-2" onClick={() => handlePayment('transfer')}>
-                <CheckCircle2 className="h-6 w-6" />
-                <span>Transf.</span>
-              </Button>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setPaymentDialogOpen(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setPaymentDialogOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

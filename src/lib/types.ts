@@ -1,9 +1,10 @@
 
-export type OrderStatus = 'draft' | 'confirmed' | 'paid';
+export type OrderStatus = 'draft' | 'open' | 'confirmed' | 'paid';
 export type TicketStatus = 'new' | 'preparing' | 'ready' | 'served';
 export type SoldBy = 'unidad' | 'peso';
 export type DiscountType = 'porcentaje' | 'monto';
 export type TpvShape = 'cuadrado' | 'circulo' | 'hexágono';
+export type ServiceType = 'mesa' | 'llevar' | 'domicilio' | 'rappi' | 'ubereats' | 'didifood';
 
 export interface ModifierOption {
   name: string;
@@ -27,6 +28,16 @@ export interface Discount {
   name: string;
   value: number;
   type: DiscountType;
+}
+
+export interface Customer {
+  id?: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  points: number;
+  totalVisits: number;
+  lastVisit: number;
 }
 
 export interface MenuItem {
@@ -53,6 +64,8 @@ export interface OrderItem {
   name: string;
   quantity: number;
   priceAtOrder: number;
+  selectedModifiers: ModifierOption[];
+  notes?: string;
 }
 
 export interface Payment {
@@ -70,9 +83,15 @@ export interface Order {
   subtotal: number;
   tax: number;
   total: number;
+  discountAmount: number;
   payments: Payment[];
   paidAmount: number;
+  serviceType: ServiceType;
+  tableNumber?: string;
+  customerId?: string;
+  notes?: string;
   createdAt: number;
+  loyaltyPointsEarned?: number;
 }
 
 export interface KitchenTicket {
@@ -80,6 +99,8 @@ export interface KitchenTicket {
   orderId: string;
   firestoreOrderId?: string;
   status: TicketStatus;
-  items: { name: string; quantity: number }[];
+  items: { name: string; quantity: number; modifiers?: string[]; notes?: string }[];
   timestamp: number;
+  serviceType: ServiceType;
+  tableNumber?: string;
 }
