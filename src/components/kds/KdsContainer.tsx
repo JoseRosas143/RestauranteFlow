@@ -1,7 +1,6 @@
-
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KitchenTicket, TicketStatus } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -41,7 +40,13 @@ const INITIAL_TICKETS: KitchenTicket[] = [
 ];
 
 export default function KdsContainer() {
-  const [tickets, setTickets] = useState<KitchenTicket[]>(INITIAL_TICKETS);
+  const [tickets, setTickets] = useState<KitchenTicket[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setTickets(INITIAL_TICKETS);
+  }, []);
 
   const updateTicketStatus = (ticketId: string, nextStatus: TicketStatus) => {
     setTickets(prev => prev.map(t => 
@@ -54,6 +59,10 @@ export default function KdsContainer() {
     const mins = Math.floor((Date.now() - timestamp) / 60000);
     return `hace ${mins}m`;
   };
+
+  if (!mounted) {
+    return <div className="flex h-screen items-center justify-center bg-background text-primary font-bold">Cargando Cocina...</div>;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background">

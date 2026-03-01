@@ -1,7 +1,6 @@
-
 "use client"
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { TrendingUp, DollarSign, ShoppingBag, Users, ArrowUpRight, ArrowDownRight } from 'lucide-react';
@@ -26,6 +25,22 @@ const TOP_ITEMS = [
 ];
 
 export default function AdminDashboard() {
+  const [mounted, setMounted] = useState(false);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+
+  useEffect(() => {
+    setMounted(true);
+    // Generar datos aleatorios de transacciones solo en el cliente
+    const transactions = [1, 2, 3, 4, 5].map((i) => ({
+      id: `PED-209${i}`,
+      time: `Hoy a las ${10 + i}:${20 + i * 5} AM`,
+      amount: (Math.random() * 50 + 20).toFixed(2),
+    }));
+    setRecentTransactions(transactions);
+  }, []);
+
+  if (!mounted) return null;
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="bg-white border-b px-8 py-6 flex justify-between items-center">
@@ -116,20 +131,20 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
              <div className="space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex items-center justify-between p-4 bg-muted/20 rounded-xl">
+                {recentTransactions.map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between p-4 bg-muted/20 rounded-xl">
                     <div className="flex items-center gap-4">
                       <div className="p-2 bg-primary/10 rounded-full text-primary">
                         <ShoppingBag className="h-5 w-5" />
                       </div>
                       <div>
-                        <div className="font-bold">PED-209{i}</div>
-                        <div className="text-xs text-muted-foreground">Hoy a las {10 + i}:{20 + i * 5} AM</div>
+                        <div className="font-bold">{tx.id}</div>
+                        <div className="text-xs text-muted-foreground">{tx.time}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-6">
                       <Badge variant="outline" className="text-green-600 bg-green-50 border-green-100 font-bold px-3">PAGADO</Badge>
-                      <div className="font-bold text-lg">${(Math.random() * 50 + 20).toFixed(2)}</div>
+                      <div className="font-bold text-lg">${tx.amount}</div>
                     </div>
                   </div>
                 ))}

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MenuItem, Order, Payment } from '@/lib/types';
 import { INITIAL_MENU } from '@/lib/mock-data';
 import { Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart } from 'lucide-react';
@@ -16,10 +16,11 @@ import Image from 'next/image';
 const TAX_RATE = 0.08;
 
 export default function PosContainer() {
-  const [activeOrder, setActiveOrder] = useState<Order>(createEmptyOrder());
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [menu] = useState<MenuItem[]>(INITIAL_MENU);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [partialAmount, setPartialAmount] = useState<string>('');
+  const [mounted, setMounted] = useState(false);
   
   function createEmptyOrder(): Order {
     return {
@@ -35,13 +36,19 @@ export default function PosContainer() {
     };
   }
 
+  useEffect(() => {
+    setMounted(true);
+    setActiveOrder(createEmptyOrder());
+  }, []);
+
   const addToCart = (item: MenuItem) => {
-    if (activeOrder.status !== 'draft') {
+    if (!activeOrder || activeOrder.status !== 'draft') {
       toast({ title: 'Pedido Bloqueado', description: 'Los pedidos confirmados no pueden modificarse.' });
       return;
     }
 
     setActiveOrder(prev => {
+      if (!prev) return null;
       const existing = prev.items.find(i => i.menuItemId === item.id);
       let newItems;
       if (existing) {
@@ -62,8 +69,9 @@ export default function PosContainer() {
   };
 
   const updateQuantity = (itemId: string, delta: number) => {
-    if (activeOrder.status !== 'draft') return;
+    if (!activeOrder || activeOrder.status !== 'draft') return;
     setActiveOrder(prev => {
+      if (!prev) return null;
       const newItems = prev.items.map(i => {
         if (i.id === itemId) {
           const newQty = Math.max(0, i.quantity + delta);
@@ -83,15 +91,16 @@ export default function PosContainer() {
   };
 
   const confirmOrder = () => {
-    if (activeOrder.items.length === 0) {
+    if (!activeOrder || activeOrder.items.length === 0) {
       toast({ title: 'Carrito Vacío', description: 'Añade productos antes de confirmar.' });
       return;
     }
-    setActiveOrder(prev => ({ ...prev, status: 'confirmed' }));
+    setActiveOrder(prev => prev ? ({ ...prev, status: 'confirmed' }) : null);
     toast({ title: 'Pedido Confirmado', description: 'Enviado al sistema de cocina.' });
   };
 
   const handlePayment = (method: 'cash' | 'card' | 'transfer') => {
+    if (!activeOrder) return;
     const amountToPay = parseFloat(partialAmount) || (activeOrder.total - activeOrder.paidAmount);
     
     if (amountToPay <= 0 || isNaN(amountToPay)) {
@@ -114,12 +123,15 @@ export default function PosContainer() {
     const newPaidAmount = activeOrder.paidAmount + amountToPay;
     const isFullyPaid = newPaidAmount >= activeOrder.total - 0.01;
 
-    setActiveOrder(prev => ({
-      ...prev,
-      payments: [...prev.payments, newPayment],
-      paidAmount: newPaidAmount,
-      status: isFullyPaid ? 'paid' : prev.status
-    }));
+    setActiveOrder(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        payments: [...prev.payments, newPayment],
+        paidAmount: newPaidAmount,
+        status: isFullyPaid ? 'paid' : prev.status
+      };
+    });
 
     setPartialAmount('');
     if (isFullyPaid) {
@@ -134,6 +146,10 @@ export default function PosContainer() {
     setActiveOrder(createEmptyOrder());
     setPaymentDialogOpen(false);
   };
+
+  if (!mounted || !activeOrder) {
+    return <div className="flex h-screen items-center justify-center bg-background text-primary font-bold">Cargando Terminal...</div>;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
