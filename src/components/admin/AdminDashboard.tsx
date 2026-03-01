@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, addDoc, deleteDoc, doc, query, limit, getDocs, writeBatch } from 'firebase/firestore';
-import { Plus, Trash2, Package, Tag, Layers, Percent, Database, Loader2, Save, Image as ImageIcon, Settings } from 'lucide-react';
+import { Plus, Trash2, Package, Tag, Layers, Percent, Database, Loader2, Save, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, Category, Modifier, Discount, SoldBy, TpvShape, DiscountType } from '@/lib/types';
 import { INITIAL_MENU } from '@/lib/mock-data';
@@ -40,32 +40,53 @@ export default function AdminDashboard() {
       const menuRef = collection(db, 'menu');
       const snap = await getDocs(query(menuRef, limit(1)));
       
-      if (!snap.empty) {
-        toast({ title: "Datos ya existentes", description: "El catálogo ya contiene información." });
-        setIsSeeding(false);
-        return;
-      }
-
       const batch = writeBatch(db);
 
-      // Cargar categorías básicas
-      const defaultCats = ['Sándwiches', 'Entradas', 'Bebidas', 'Acompañamientos'];
-      for (const catName of defaultCats) {
+      // 1. Crear Categorías base
+      const defaultCats = [
+        { name: 'Sándwiches', color: '#B8732E' },
+        { name: 'Entradas', color: '#DD3C3C' },
+        { name: 'Bebidas', color: '#7C3AED' },
+        { name: 'Acompañamientos', color: '#10B981' }
+      ];
+
+      for (const cat of defaultCats) {
         const catRef = doc(collection(db, 'categories'));
-        batch.set(catRef, { name: catName, color: '#B8732E' });
+        batch.set(catRef, cat);
       }
 
-      // Cargar menú inicial
+      // 2. Cargar Menú Inicial
       for (const item of INITIAL_MENU) {
         const itemRef = doc(collection(db, 'menu'));
-        batch.set(itemRef, item);
+        batch.set(itemRef, {
+          ...item,
+          price: Number(item.price),
+          cost: Number(item.cost || 0),
+          inventoryCount: item.trackInventory ? Number(item.inventoryCount || 0) : 0,
+          createdAt: Date.now()
+        });
       }
 
+      // 3. Modificadores iniciales
+      const modRef = doc(collection(db, 'modifiers'));
+      batch.set(modRef, {
+        name: 'Ingredientes Extra',
+        options: [
+          { name: 'Huevo frito', price: 1.5 },
+          { name: 'Queso extra', price: 2.0 },
+          { name: 'Cebolla caramelizada', price: 1.0 }
+        ]
+      });
+
       await batch.commit();
-      toast({ title: "¡Éxito!", description: "Catálogo inicial cargado correctamente." });
-    } catch (error) {
+      toast({ title: "¡Éxito!", description: "Catálogo inicial cargado correctamente en Firebase." });
+    } catch (error: any) {
       console.error("Error seeding data:", error);
-      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los datos iniciales." });
+      toast({ 
+        variant: "destructive", 
+        title: "Error de conexión", 
+        description: error.message || "No se pudieron guardar los datos en Firestore." 
+      });
     } finally {
       setIsSeeding(false);
     }
@@ -135,7 +156,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
   });
 
   const saveItem = async () => {
-    if (!newItem.name || !newItem.price) {
+    if (!newItem.name || newItem.price === undefined) {
       toast({ variant: 'destructive', title: "Faltan datos", description: "Nombre y precio son obligatorios." });
       return;
     }
@@ -144,13 +165,14 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
       await addDoc(collection(db, 'menu'), {
         ...newItem,
         price: Number(newItem.price),
-        cost: Number(newItem.cost),
-        inventoryCount: newItem.trackInventory ? Number(newItem.inventoryCount) : 0
+        cost: Number(newItem.cost || 0),
+        inventoryCount: newItem.trackInventory ? Number(newItem.inventoryCount || 0) : 0,
+        createdAt: Date.now()
       });
       toast({ title: "Artículo Guardado", description: `${newItem.name} se agregó al catálogo.` });
       setNewItem({ name: '', price: 0, cost: 0, category: '', soldBy: 'unidad', trackInventory: false, tpvColor: '#B8732E', tpvShape: 'cuadrado', reference: '', barcode: '' });
     } catch (e) {
-      toast({ variant: 'destructive', title: "Error al guardar" });
+      toast({ variant: 'destructive', title: "Error al guardar", description: "Verifica los permisos de Firestore." });
     } finally {
       setLoading(false);
     }
@@ -221,12 +243,12 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
           <div className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border border-dashed">
             <div className="space-y-0.5">
               <Label className="text-base">Seguir Inventario</Label>
-              <p className="text-xs text-muted-foreground">Controlar stock disponible automáticamente</p>
+              <p className="text-xs text-muted-foreground">Controlar stock disponible</p>
             </div>
             <Switch checked={newItem.trackInventory} onCheckedChange={v => setNewItem({...newItem, trackInventory: v})} />
           </div>
           {newItem.trackInventory && (
-            <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="space-y-2">
               <Label>Piezas en Stock inicial</Label>
               <Input type="number" value={newItem.inventoryCount} onChange={e => setNewItem({...newItem, inventoryCount: Number(e.target.value)})} className="h-11" />
             </div>
@@ -262,16 +284,16 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Lista de Artículos</CardTitle>
-            <CardDescription>{items.length} productos registrados en total.</CardDescription>
+            <CardDescription>{items.length} productos registrados.</CardDescription>
           </div>
-          <Badge variant="outline" className="h-6">Actualizado</Badge>
+          <Badge variant="outline" className="h-6">Sincronizado</Badge>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[650px] pr-4">
             {items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground opacity-50 border-2 border-dashed rounded-xl">
                 <Package className="h-12 w-12 mb-2" />
-                <p>No hay artículos. Empieza por crear uno o carga el catálogo inicial.</p>
+                <p>No hay artículos. Usa el botón de carga inicial o crea uno.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -294,17 +316,11 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
                           <span>•</span>
                           <span>${item.price.toFixed(2)}</span>
                         </div>
-                        {item.reference && <div className="text-[10px] text-muted-foreground/60 mt-1">Ref: {item.reference}</div>}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id!)} className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-4 w-4" /></Button>
-                      {item.trackInventory && (
-                        <Badge variant={item.inventoryCount! < 10 ? 'destructive' : 'secondary'} className="text-[10px]">
-                          Stock: {item.inventoryCount}
-                        </Badge>
-                      )}
-                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id!)} className="text-destructive group-hover:opacity-100 opacity-0 transition-opacity">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -349,7 +365,6 @@ function CategoriasManager({ categories }: { categories: Category[] }) {
             <CardContent className="p-4 flex justify-between items-center">
               <div>
                 <span className="font-bold text-lg">{c.name}</span>
-                <p className="text-[10px] text-muted-foreground">ID: {c.id?.substring(0, 5)}</p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'categories', c.id!))} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
             </CardContent>
@@ -380,13 +395,13 @@ function ModificadoresManager({ modifiers }: { modifiers: Modifier[] }) {
         <CardHeader><CardTitle>Nuevo Modificador</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nombre del Grupo (Ej: Término de carne o Ingrediente Extra)</Label>
+            <Label>Nombre del Grupo</Label>
             <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Extras" className="h-11" />
           </div>
           <div className="space-y-3">
             <Label className="text-sm font-bold flex justify-between">Opciones y Precios Extra <Plus className="h-3 w-3 cursor-pointer" onClick={addOption}/></Label>
             {options.map((opt, idx) => (
-              <div key={idx} className="flex gap-2 animate-in fade-in slide-in-from-right-2 duration-200">
+              <div key={idx} className="flex gap-2">
                 <Input placeholder="Opción" value={opt.name} onChange={e => {
                   const n = [...options]; n[idx].name = e.target.value; setOptions(n);
                 }} className="flex-1" />
@@ -397,21 +412,20 @@ function ModificadoresManager({ modifiers }: { modifiers: Modifier[] }) {
             ))}
             <Button variant="outline" size="sm" onClick={addOption} className="w-full text-xs font-bold border-dashed"><Plus className="h-3 w-3 mr-1" /> Añadir otra opción</Button>
           </div>
-          <Button className="w-full h-11" onClick={save}>Guardar Grupo de Modificadores</Button>
+          <Button className="w-full h-11" onClick={save}>Guardar Modificadores</Button>
         </CardContent>
       </Card>
       <div className="space-y-4 h-[600px] overflow-auto pr-2">
-        {modifiers.length === 0 && <p className="text-center text-muted-foreground py-10 opacity-50">No hay modificadores creados.</p>}
         {modifiers.map(m => (
           <Card key={m.id} className="shadow-sm">
-            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0 border-b">
+            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b">
               <CardTitle className="text-base font-bold text-primary">{m.name}</CardTitle>
               <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'modifiers', m.id!))} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
             </CardHeader>
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-2">
                 {m.options.map((o, i) => (
-                  <Badge key={i} variant="secondary" className="px-2 py-1">${o.price > 0 ? `+${o.price.toFixed(2)}` : 'Gratis'} • {o.name}</Badge>
+                  <Badge key={i} variant="secondary">${o.price.toFixed(2)} • {o.name}</Badge>
                 ))}
               </div>
             </CardContent>
@@ -450,7 +464,7 @@ function DescuentosManager({ discounts }: { discounts: Discount[] }) {
               <Input type="number" value={value} onChange={e => setValue(Number(e.target.value))} className="h-11" />
             </div>
             <div className="space-y-2">
-              <Label>Tipo de Aplicación</Label>
+              <Label>Tipo</Label>
               <Select onValueChange={(v: DiscountType) => setType(v)} value={type}>
                 <SelectTrigger className="h-11"><SelectValue placeholder="Porcentaje" /></SelectTrigger>
                 <SelectContent>
@@ -460,21 +474,18 @@ function DescuentosManager({ discounts }: { discounts: Discount[] }) {
               </Select>
             </div>
           </div>
-          <Button className="w-full h-11" onClick={save}>Crear Regla de Descuento</Button>
+          <Button className="w-full h-11" onClick={save}>Crear Descuento</Button>
         </CardContent>
       </Card>
       <div className="space-y-4">
-        {discounts.length === 0 && <p className="text-center text-muted-foreground py-10 opacity-50">Sin reglas de descuento.</p>}
         {discounts.map(d => (
           <Card key={d.id} className="border-l-4 border-l-green-500">
             <CardContent className="p-4 flex justify-between items-center">
               <div>
                 <div className="font-bold text-lg">{d.name}</div>
-                <div className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                    {d.type === 'porcentaje' ? `${d.value}% de descuento` : `$${d.value.toFixed(2)} de rebaja`}
-                  </Badge>
-                </div>
+                <Badge variant="outline" className="text-green-600">
+                  {d.type === 'porcentaje' ? `${d.value}%` : `$${d.value}`}
+                </Badge>
               </div>
               <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'discounts', d.id!))} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
             </CardContent>
