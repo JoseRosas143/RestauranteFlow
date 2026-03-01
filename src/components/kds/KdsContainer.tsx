@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { KitchenTicket, TicketStatus } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, doc, updateDoc, query, orderBy, where } from 'firebase/firestore';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 const STATUS_CONFIG = {
   new: { label: 'Nuevo', color: 'bg-blue-100 text-blue-800', icon: <Bell className="h-4 w-4" /> },
@@ -22,9 +22,18 @@ const STATUS_CONFIG = {
 
 export default function KdsContainer() {
   const db = useFirestore();
-  const { data: tickets, loading } = useCollection<KitchenTicket>(
-    query(collection(db, 'tickets'), where('status', '!=', 'served'), orderBy('status', 'asc'), orderBy('timestamp', 'asc'))
+  const router = useRouter();
+  
+  const ticketsQuery = useMemo(() => 
+    query(
+      collection(db, 'tickets'), 
+      where('status', '!=', 'served'), 
+      orderBy('status', 'asc'), 
+      orderBy('timestamp', 'asc')
+    ), [db]
   );
+
+  const { data: tickets, loading } = useCollection<KitchenTicket>(ticketsQuery);
 
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -56,11 +65,14 @@ export default function KdsContainer() {
     <div className="flex flex-col h-screen bg-background">
       <header className="bg-primary p-4 text-white flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-4">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 rounded-full">
-              <ArrowLeft className="h-6 w-6" />
-            </Button>
-          </Link>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-white hover:bg-white/20 rounded-full cursor-pointer"
+            onClick={() => router.push('/')}
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
           <div className="flex items-center gap-3">
             <ChefHat className="h-8 w-8" />
             <h1 className="text-2xl font-bold">Pantalla de Cocina (KDS)</h1>

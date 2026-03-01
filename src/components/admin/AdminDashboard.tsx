@@ -1,8 +1,8 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,20 +12,26 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Settings, Edit2, X, ImageIcon, ArrowLeft, Upload } from 'lucide-react';
+import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Edit2, X, ImageIcon, ArrowLeft, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { MenuItem, Category, Modifier, Discount, SoldBy, TpvShape, DiscountType } from '@/lib/types';
-import Link from 'next/link';
+import { MenuItem, Category, Modifier, Discount, SoldBy, DiscountType } from '@/lib/types';
+import { useRouter } from 'next/navigation';
 
 export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
   const db = useFirestore();
+  const router = useRouter();
 
-  const { data: items } = useCollection<MenuItem>(collection(db, 'menu'));
-  const { data: categories } = useCollection<Category>(collection(db, 'categories'));
-  const { data: modifiers } = useCollection<Modifier>(collection(db, 'modifiers'));
-  const { data: discounts } = useCollection<Discount>(collection(db, 'discounts'));
+  const itemsQuery = useMemo(() => query(collection(db, 'menu'), orderBy('name', 'asc')), [db]);
+  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name', 'asc')), [db]);
+  const modifiersQuery = useMemo(() => collection(db, 'modifiers'), [db]);
+  const discountsQuery = useMemo(() => collection(db, 'discounts'), [db]);
+
+  const { data: items } = useCollection<MenuItem>(itemsQuery);
+  const { data: categories } = useCollection<Category>(categoriesQuery);
+  const { data: modifiers } = useCollection<Modifier>(modifiersQuery);
+  const { data: discounts } = useCollection<Discount>(discountsQuery);
 
   useEffect(() => {
     setMounted(true);
@@ -37,9 +43,14 @@ export default function AdminDashboard() {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="bg-white border-b px-8 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
-          <Link href="/" className="p-2 hover:bg-muted rounded-full transition-colors">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="p-2 hover:bg-muted rounded-full transition-colors cursor-pointer"
+            onClick={() => router.push('/')}
+          >
             <ArrowLeft className="h-6 w-6 text-primary" />
-          </Link>
+          </Button>
           <div>
             <h1 className="text-3xl font-bold text-primary">Gestión de Catálogo</h1>
             <p className="text-muted-foreground">Configura tus artículos, categorías y reglas de venta.</p>
@@ -104,7 +115,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1024 * 512) {
-        toast({ variant: 'destructive', title: "Imagen demasiado grande" });
+        toast({ variant: 'destructive', title: "Imagen demasiado grande (Max 512KB)" });
         return;
       }
       const reader = new FileReader();
@@ -117,7 +128,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
 
   const saveItem = async () => {
     if (!newItem.name || newItem.price === undefined) {
-      toast({ variant: 'destructive', title: "Faltan datos" });
+      toast({ variant: 'destructive', title: "Faltan datos obligatorios" });
       return;
     }
     setLoading(true);
@@ -139,7 +150,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
       }
       resetForm();
     } catch (e) {
-      toast({ variant: 'destructive', title: "Error al guardar" });
+      toast({ variant: 'destructive', title: "Error al guardar en base de datos" });
     } finally {
       setLoading(false);
     }
@@ -173,7 +184,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
             <div className="border-2 border-dashed rounded-xl h-32 flex flex-col items-center justify-center bg-muted overflow-hidden relative">
               {newItem.image ? (
                 <>
-                  <img src={newItem.image} className="w-full h-full object-cover" />
+                  <img src={newItem.image} className="w-full h-full object-cover" alt="Preview" />
                   <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={() => setNewItem({...newItem, image: ''})}><X /></Button>
                 </>
               ) : (
@@ -181,7 +192,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
               )}
             </div>
             <Button variant="outline" className="w-full" onClick={() => document.getElementById('file-up')?.click()}><Upload className="mr-2 h-4 w-4" /> Subir</Button>
-            <input id="file-up" type="file" className="hidden" onChange={handleImageUpload} />
+            <input id="file-up" type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -224,11 +235,11 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
             <Label>Inventario</Label>
             <Switch checked={newItem.trackInventory} onCheckedChange={v => setNewItem({...newItem, trackInventory: v})} />
           </div>
-          {newItem.trackInventory && <Input type="number" placeholder="Stock" value={newItem.inventoryCount} onChange={e => setNewItem({...newItem, inventoryCount: Number(e.target.value)})} />}
+          {newItem.trackInventory && <Input type="number" placeholder="Stock disponible" value={newItem.inventoryCount} onChange={e => setNewItem({...newItem, inventoryCount: Number(e.target.value)})} />}
           
           <Button className="w-full h-12 font-bold" onClick={saveItem} disabled={loading}>
             {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {editingId ? 'Actualizar' : 'Guardar'}
+            {editingId ? 'Actualizar Artículo' : 'Guardar Artículo'}
           </Button>
         </CardContent>
       </Card>
@@ -239,8 +250,8 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
             {items.map(item => (
               <div key={item.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/50 group">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden">
-                    {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <Package className="p-2 opacity-20" />}
+                  <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+                    {item.image ? <img src={item.image} className="w-full h-full object-cover" alt={item.name} /> : <Package className="p-2 opacity-20" />}
                   </div>
                   <div>
                     <div className="font-bold text-sm">{item.name}</div>

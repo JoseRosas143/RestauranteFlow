@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MenuItem, Order, Payment, OrderItem, ServiceType, Modifier, ModifierOption, Customer, Discount } from '@/lib/types';
 import { 
   Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart, 
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, addDoc, query, orderBy, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 
@@ -25,17 +25,22 @@ const TAX_RATE = 0.08;
 
 export default function PosContainer() {
   const db = useFirestore();
-  const { data: menuItems, loading: menuLoading } = useCollection<MenuItem>(
-    query(collection(db, 'menu'), orderBy('name', 'asc'))
-  );
-  const { data: modifiersData } = useCollection<Modifier>(collection(db, 'modifiers'));
-  const { data: customersData } = useCollection<Customer>(collection(db, 'customers'));
-  const { data: discountsData } = useCollection<Discount>(collection(db, 'discounts'));
+  const router = useRouter();
+  
+  // Memorizar consultas para evitar re-suscripciones infinitas
+  const menuQuery = useMemo(() => query(collection(db, 'menu'), orderBy('name', 'asc')), [db]);
+  const modifiersQuery = useMemo(() => collection(db, 'modifiers'), [db]);
+  const customersQuery = useMemo(() => collection(db, 'customers'), [db]);
+  const discountsQuery = useMemo(() => collection(db, 'discounts'), [db]);
+
+  const { data: menuItems } = useCollection<MenuItem>(menuQuery);
+  const { data: modifiersData } = useCollection<Modifier>(modifiersQuery);
+  const { data: customersData } = useCollection<Customer>(customersQuery);
+  const { data: discountsData } = useCollection<Discount>(discountsQuery);
 
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [mounted, setMounted] = useState(false);
   
-  // Dialog States
   const [modifierDialogOpen, setModifierDialogOpen] = useState(false);
   const [selectedItemForMod, setSelectedItemForMod] = useState<MenuItem | null>(null);
   const [tempModifiers, setTempModifiers] = useState<ModifierOption[]>([]);
@@ -126,7 +131,6 @@ export default function PosContainer() {
       return acc + ((item.priceAtOrder + modsPrice) * item.quantity);
     }, 0);
     
-    // Simplificación de motor de descuentos (se puede expandir)
     const discount = order.discountAmount || 0;
     const tax = (subtotal - discount) * TAX_RATE;
     const total = subtotal - discount + tax;
@@ -207,9 +211,8 @@ export default function PosContainer() {
     const newPaidAmount = activeOrder.paidAmount + amountToPay;
     const isFullyPaid = newPaidAmount >= activeOrder.total - 0.01;
 
-    // Actualizar puntos de lealtad si hay cliente
     if (isFullyPaid && activeOrder.customerId) {
-      const points = Math.floor(activeOrder.total / 10); // 1 punto cada $10
+      const points = Math.floor(activeOrder.total / 10);
       await updateDoc(doc(db, 'customers', activeOrder.customerId), {
         points: increment(points),
         totalVisits: increment(1),
@@ -243,13 +246,17 @@ export default function PosContainer() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* PANEL IZQUIERDO: Catálogo */}
       <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
           <div className="flex items-center gap-4">
-            <Link href="/" className="p-2 hover:bg-muted rounded-full transition-colors">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="p-2 hover:bg-muted rounded-full transition-colors cursor-pointer"
+              onClick={() => router.push('/')}
+            >
               <ArrowLeft className="h-6 w-6 text-primary" />
-            </Link>
+            </Button>
             <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
               <ShoppingCart className="h-6 w-6" /> ChoripanFlow POS
             </h1>
@@ -308,13 +315,12 @@ export default function PosContainer() {
           </div>
         </ScrollArea>
 
-        {/* Barra Inferior de Acciones Rápidas */}
         <div className="grid grid-cols-4 gap-4 bg-white p-4 rounded-xl border shadow-md">
           <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => setCustomerDialogOpen(true)}>
             <User className="h-5 w-5" />
             <span className="text-[10px] uppercase font-bold">Cliente</span>
           </Button>
-          <Button variant="outline" className="h-16 flex-col gap-1">
+          <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => toast({ title: "Próximamente", description: "Módulo de descuentos manuales" })}>
             <Tag className="h-5 w-5" />
             <span className="text-[10px] uppercase font-bold">Descuentos</span>
           </Button>
@@ -329,7 +335,6 @@ export default function PosContainer() {
         </div>
       </div>
 
-      {/* PANEL DERECHO: Resumen Pedido */}
       <div className="w-96 bg-white border-l shadow-2xl flex flex-col">
         <div className="p-6 border-b bg-muted/30">
           <div className="flex justify-between items-start">
@@ -431,7 +436,6 @@ export default function PosContainer() {
         </div>
       </div>
 
-      {/* DIALOG: Modificadores y Personalización */}
       <Dialog open={modifierDialogOpen} onOpenChange={setModifierDialogOpen}>
         <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
           <div className="bg-primary p-6 text-white">
@@ -472,7 +476,6 @@ export default function PosContainer() {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG: Clientes y Fidelización */}
       <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Buscador de Clientes</DialogTitle></DialogHeader>
@@ -504,7 +507,6 @@ export default function PosContainer() {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG: Pago */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
