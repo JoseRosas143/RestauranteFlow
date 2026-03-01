@@ -3,19 +3,53 @@
   "entities": {
     "MenuItem": {
       "title": "MenuItem",
-      "description": "Un producto disponible en el menú del restaurante.",
+      "description": "Un producto disponible en el menú con detalles de inventario y TPV.",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
         "price": { "type": "number" },
+        "cost": { "type": "number" },
         "category": { "type": "string" },
-        "image": { "type": "string" }
+        "categoryId": { "type": "string" },
+        "image": { "type": "string" },
+        "soldBy": { "type": "string", "enum": ["unidad", "peso"] },
+        "reference": { "type": "string" },
+        "barcode": { "type": "string" },
+        "trackInventory": { "type": "boolean" },
+        "inventoryCount": { "type": "number" },
+        "tpvColor": { "type": "string" },
+        "tpvShape": { "type": "string", "enum": ["cuadrado", "circulo", "hexágono"] },
+        "modifiers": { "type": "array" }
       },
-      "required": ["name", "price", "category"]
+      "required": ["name", "price", "soldBy", "trackInventory"]
+    },
+    "Category": {
+      "title": "Category",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "color": { "type": "string" }
+      }
+    },
+    "Modifier": {
+      "title": "Modifier",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "options": { "type": "array" }
+      }
+    },
+    "Discount": {
+      "title": "Discount",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": "number" },
+        "type": { "type": "string", "enum": ["porcentaje", "monto"] }
+      }
     },
     "Order": {
       "title": "Order",
-      "description": "Un pedido realizado por un cliente.",
       "type": "object",
       "properties": {
         "status": { "type": "string", "enum": ["draft", "confirmed", "paid"] },
@@ -26,34 +60,17 @@
         "paidAmount": { "type": "number" },
         "createdAt": { "type": "number" }
       }
-    },
-    "KitchenTicket": {
-      "title": "KitchenTicket",
-      "description": "Un ticket para la preparación en cocina.",
-      "type": "object",
-      "properties": {
-        "orderId": { "type": "string" },
-        "status": { "type": "string", "enum": ["new", "preparing", "ready", "served"] },
-        "items": { "type": "array" },
-        "timestamp": { "type": "number" }
-      }
     }
   },
   "auth": {
     "providers": ["google.com"]
   },
   "firestore": {
-    "/menu/{itemId}": {
-      "schema": "MenuItem",
-      "description": "Colección de productos del menú."
-    },
-    "/orders/{orderId}": {
-      "schema": "Order",
-      "description": "Colección de pedidos de clientes."
-    },
-    "/tickets/{ticketId}": {
-      "schema": "KitchenTicket",
-      "description": "Colección de tickets de cocina."
-    }
+    "/menu/{itemId}": { "schema": "MenuItem" },
+    "/categories/{catId}": { "schema": "Category" },
+    "/modifiers/{modId}": { "schema": "Modifier" },
+    "/discounts/{discId}": { "schema": "Discount" },
+    "/orders/{orderId}": { "schema": "Order" },
+    "/tickets/{ticketId}": { "schema": "KitchenTicket" }
   }
 }
