@@ -3,8 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { TrendingUp, DollarSign, ShoppingBag, Users, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { TrendingUp, DollarSign, ShoppingBag, Users, ArrowUpRight, ArrowDownRight, Database, Loader2, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useFirestore } from '@/firebase';
+import { collection, addDoc, getDocs, query, limit } from 'firebase/firestore';
+import { INITIAL_MENU } from '@/lib/mock-data';
+import { useToast } from '@/hooks/use-toast';
 
 const SALES_DATA = [
   { name: 'Lun', sales: 4200 },
@@ -27,10 +32,13 @@ const TOP_ITEMS = [
 export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const db = useFirestore();
+  const { toast } = useToast();
 
   useEffect(() => {
     setMounted(true);
-    // Generar datos aleatorios de transacciones solo en el cliente
+    // Generar datos aleatorios de transacciones solo en el cliente para evitar errores de hidratación
     const transactions = [1, 2, 3, 4, 5].map((i) => ({
       id: `PED-209${i}`,
       time: `Hoy a las ${10 + i}:${20 + i * 5} AM`,
@@ -38,6 +46,48 @@ export default function AdminDashboard() {
     }));
     setRecentTransactions(transactions);
   }, []);
+
+  const seedMenu = async () => {
+    setIsSeeding(true);
+    try {
+      // Verificar si ya hay items para no duplicar
+      const menuRef = collection(db, 'menu');
+      const q = query(menuRef, limit(1));
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        toast({
+          title: "Menú ya inicializado",
+          description: "Ya existen productos en la base de datos.",
+        });
+        setIsSeeding(false);
+        return;
+      }
+
+      // Cargar items de INITIAL_MENU
+      const promises = INITIAL_MENU.map(item => {
+        // Quitamos el ID fijo para que Firestore genere uno nuevo o usamos el mismo
+        const { id, ...itemData } = item;
+        return addDoc(collection(db, 'menu'), itemData);
+      });
+
+      await Promise.all(promises);
+      
+      toast({
+        title: "¡Éxito!",
+        description: "El menú inicial ha sido cargado en Firestore.",
+      });
+    } catch (error) {
+      console.error("Error al cargar menú:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo cargar el menú inicial.",
+      });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   if (!mounted) return null;
 
@@ -49,6 +99,19 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">Rendimiento en tiempo real para ChoripanFlow.</p>
         </div>
         <div className="flex gap-4">
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2" 
+            onClick={seedMenu}
+            disabled={isSeeding}
+          >
+            {isSeeding ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Database className="h-4 w-4" />
+            )}
+            Cargar Menú Inicial
+          </Button>
           <div className="bg-secondary/50 rounded-lg p-2 px-4 flex items-center gap-3">
             <span className="text-sm font-medium">Periodo del Informe:</span>
             <Badge className="bg-primary text-white">Esta Semana</Badge>
