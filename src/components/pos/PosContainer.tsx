@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState } from 'react';
@@ -159,12 +158,18 @@ export default function PosContainer() {
                 onClick={() => addToCart(item)}
               >
                 <div className="relative h-32 w-full overflow-hidden">
-                  <Image 
-                    src={item.image} 
-                    alt={item.name} 
-                    fill 
-                    className="object-cover group-hover:scale-105 transition-transform" 
-                  />
+                  {item.image ? (
+                    <Image 
+                      src={item.image} 
+                      alt={item.name} 
+                      fill 
+                      className="object-cover group-hover:scale-105 transition-transform" 
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <ShoppingCart className="h-8 w-8 text-muted-foreground opacity-20" />
+                    </div>
+                  )}
                   <div className="absolute top-2 right-2">
                     <Badge className="bg-primary/90 text-white font-bold border-none shadow-md">
                       ${item.price.toFixed(2)}
