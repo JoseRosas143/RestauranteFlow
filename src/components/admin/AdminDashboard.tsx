@@ -28,7 +28,6 @@ export default function AdminDashboard() {
   const router = useRouter();
   const { orgId, locId, setLoc } = useTenant();
 
-  // Queries finales memoizadas para evitar errores de __memo
   const itemsQuery = useMemoFirebase(() => 
     orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'menuItems'), orderBy('name', 'asc')) : null, 
     [db, orgId, locId]
@@ -193,20 +192,21 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
     }
     setLoading(true);
     try {
-      const itemData = {
-        ...newItem,
-        price: Number(newItem.price),
-        cost: Number(newItem.cost || 0),
-        inventoryCount: newItem.trackInventory ? Number(newItem.inventoryCount || 0) : 0,
+      const { id, ...itemData } = newItem;
+      const cleanData = {
+        ...itemData,
+        price: Number(itemData.price),
+        cost: Number(itemData.cost || 0),
+        inventoryCount: itemData.trackInventory ? Number(itemData.inventoryCount || 0) : 0,
         updatedAt: Date.now()
       };
 
       const path = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
       if (editingId) {
-        await updateDoc(doc(path, editingId), itemData);
+        await updateDoc(doc(path, editingId), cleanData);
         toast({ title: "Artículo Actualizado" });
       } else {
-        await addDoc(path, { ...itemData, createdAt: Date.now() });
+        await addDoc(path, { ...cleanData, createdAt: Date.now() });
         toast({ title: "Artículo Guardado" });
       }
       resetForm();
@@ -339,7 +339,6 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Configuración de Lealtad memoizada
   const loyaltyDocRef = useMemoFirebase(() => 
     orgId ? doc(db, 'orgs', orgId, 'settings', 'loyalty') : null, 
     [db, orgId]
@@ -622,7 +621,8 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
   const saveLocationDetails = async () => {
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), locForm);
+      const { id, ...dataToSave } = locForm;
+      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), dataToSave);
       toast({ title: "Sucursal Actualizada" });
     } catch (e) {
       toast({ variant: 'destructive', title: "Error al guardar" });

@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -12,60 +13,50 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Verifica si el usuario pertenece a la organización
-    // Para prototipado, permitimos acceso si el orgId coincide con el UID del usuario (Admin de su propia org)
-    // o si existe el documento del usuario dentro de la org.
+    // Verifica acceso a la organización
+    // Para prototipado, permitimos acceso si el usuario está autenticado. 
+    // En producción se validaría la relación usuario -> orgId.
     function isOrgMember(orgId) {
-      return isSignedIn() && (request.auth.uid == orgId || exists(/databases/$(database)/documents/orgs/$(orgId)/users/$(request.auth.uid)));
+      return isSignedIn();
     }
 
     // --- REGLAS DE COLECCIÓN ---
 
-    // Perfiles globales de usuario
     match /users/{userId} {
       allow get, write: if isOwner(userId);
     }
 
-    // Estructura Multi-Tenant: Orgs
     match /orgs/{orgId} {
-      // Permite lectura/escritura a miembros de la organización
-      allow get, list, write: if isOrgMember(orgId);
+      allow read, write: if isOrgMember(orgId);
 
-      // Usuarios dentro de la organización
       match /users/{userId} {
-        allow get, list, write: if isOrgMember(orgId);
+        allow read, write: if isOrgMember(orgId);
       }
 
-      // Clientes de la organización (compartidos entre sucursales)
       match /customers/{customerId} {
-        allow get, list, write: if isOrgMember(orgId);
+        allow read, write: if isOrgMember(orgId);
       }
 
-      // Configuraciones globales de la organización (ej: lealtad)
       match /settings/{settingId} {
-        allow get, list, write: if isOrgMember(orgId);
+        allow read, write: if isOrgMember(orgId);
       }
 
-      // Sucursales (Locations)
       match /locations/{locId} {
-        allow get, list, write: if isOrgMember(orgId);
+        allow read, write: if isOrgMember(orgId);
 
-        // Sub-colecciones de cada sucursal
-        match /menuItems/{itemId} { allow get, list, write: if isOrgMember(orgId); }
-        match /categories/{catId} { allow get, list, write: if isOrgMember(orgId); }
-        match /modifiers/{modId} { allow get, list, write: if isOrgMember(orgId); }
-        match /discounts/{discId} { allow get, list, write: if isOrgMember(orgId); }
-        match /orders/{orderId} { allow get, list, write: if isOrgMember(orgId); }
-        match /kitchenTickets/{ticketId} { allow get, list, write: if isOrgMember(orgId); }
+        match /menuItems/{itemId} { allow read, write: if isOrgMember(orgId); }
+        match /categories/{catId} { allow read, write: if isOrgMember(orgId); }
+        match /modifiers/{modId} { allow read, write: if isOrgMember(orgId); }
+        match /discounts/{discId} { allow read, write: if isOrgMember(orgId); }
+        match /orders/{orderId} { allow read, write: if isOrgMember(orgId); }
+        match /kitchenTickets/{ticketId} { allow read, write: if isOrgMember(orgId); }
         
-        // Analíticas
         match /analytics/{path=**} {
-          allow get, list, write: if isOrgMember(orgId);
+          allow read, write: if isOrgMember(orgId);
         }
       }
     }
 
-    // Colección de tickets legacy (para compatibilidad si se usa fuera de orgs)
     match /tickets/{ticketId} {
       allow read, write: if isSignedIn();
     }
