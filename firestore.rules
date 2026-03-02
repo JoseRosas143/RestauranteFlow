@@ -2,8 +2,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Funciones de validación centralizadas
+    function isSignedIn() { return request.auth != null; }
+    function isMember(orgId) { return isSignedIn() && get(/databases/$(database)/documents/orgs/$(orgId)/users/$(request.auth.uid)).data.orgId == orgId; }
+    function hasAccessToLoc(orgId, locId) { return isMember(orgId) && locId in get(/databases/$(database)/documents/orgs/$(orgId)/users/$(request.auth.uid)).data.allowedLocIds; }
+    function hasRole(orgId, role) { return isMember(orgId) && get(/databases/$(database)/documents/orgs/$(orgId)/users/$(request.auth.uid)).data.role == role; }
+
+    // Segmentación Multi-Tenant
+    match /orgs/{orgId} {
+      allow read: if isSignedIn(); // Para ver nombres de orgs
+      allow write: if hasRole(orgId, 'admin');
+
+      match /users/{userId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow write: if hasRole(orgId, 'admin');
+      }
+
+      match /customers/{customerId} {
+        allow read, write: if isMember(orgId);
+      }
+
+      match /settings/{settingId} {
+        allow read: if isMember(orgId);
+        allow write: if hasRole(orgId, 'admin');
+      }
+
+      match /locations/{locId} {
+        allow read: if isMember(orgId);
+        allow write: if hasRole(orgId, 'admin');
+
+        match /menuItems/{itemId} {
+          allow read: if hasAccessToLoc(orgId, locId);
+          allow write: if hasRole(orgId, 'admin') || hasRole(orgId, 'manager');
+        }
+
+        match /orders/{orderId} {
+          allow read: if hasAccessToLoc(orgId, locId);
+          allow write: if hasAccessToLoc(orgId, locId) && (hasRole(orgId, 'cashier') || hasRole(orgId, 'admin'));
+        }
+
+        match /kitchenTickets/{ticketId} {
+          allow read: if hasAccessToLoc(orgId, locId);
+          allow write: if hasAccessToLoc(orgId, locId) && (hasRole(orgId, 'kitchen') || hasRole(orgId, 'admin'));
+        }
+
+        match /analytics/{doc=**} {
+          allow read: if hasRole(orgId, 'admin') || hasRole(orgId, 'manager');
+          allow write: if false; // Solo vía transacciones/cloud functions desde el server o validación estricta
+        }
+      }
+    }
+
+    // Permitir acceso total para el prototipo (QUITAR ESTO EN PRODUCCIÓN)
     match /{document=**} {
-      // Permitir acceso total para el MVP. En producción, esto debe restringirse.
       allow read, write: if true;
     }
   }

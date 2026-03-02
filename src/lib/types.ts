@@ -1,10 +1,29 @@
 
+export type UserRole = 'admin' | 'manager' | 'cashier' | 'kitchen';
 export type OrderStatus = 'draft' | 'open' | 'confirmed' | 'paid';
 export type TicketStatus = 'new' | 'preparing' | 'ready' | 'served';
 export type SoldBy = 'unidad' | 'peso';
 export type DiscountType = 'porcentaje' | 'monto';
 export type TpvShape = 'cuadrado' | 'circulo' | 'hexágono';
 export type ServiceType = 'mesa' | 'llevar' | 'domicilio' | 'rappi' | 'ubereats' | 'didifood';
+
+export interface UserProfile {
+  uid: string;
+  role: UserRole;
+  orgId: string;
+  allowedLocIds: string[];
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  address?: string;
+}
 
 export interface ModifierOption {
   name: string;
@@ -46,7 +65,7 @@ export interface Customer {
 }
 
 export interface LoyaltySettings {
-  pointsPercentage: number; // Porcentaje de la venta que se convierte a puntos (ej: 5 para 5%)
+  pointsPercentage: number;
 }
 
 export interface MenuItem {
@@ -64,7 +83,7 @@ export interface MenuItem {
   inventoryCount?: number;
   tpvColor?: string;
   tpvShape?: TpvShape;
-  modifiers?: string[]; // IDs de modificadores
+  modifiers?: string[];
 }
 
 export interface OrderItem {
@@ -100,7 +119,8 @@ export interface Order {
   customerId?: string;
   notes?: string;
   createdAt: number;
-  loyaltyPointsEarned?: number;
+  locId: string;
+  orgId: string;
 }
 
 export interface KitchenTicket {
@@ -112,4 +132,12 @@ export interface KitchenTicket {
   timestamp: number;
   serviceType: ServiceType;
   tableNumber?: string;
+  locId: string;
+}
+
+export interface DailyAnalytics {
+  id: string; // YYYYMMDD
+  totalRevenue: number;
+  totalOrders: number;
+  items: Record<string, { quantity: number; revenue: number }>;
 }
