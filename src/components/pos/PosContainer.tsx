@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -29,14 +30,30 @@ export default function PosContainer() {
   const router = useRouter();
   const { orgId, locId } = useTenant();
   
-  const menuPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'menuItems') : null, [db, orgId, locId]);
-  const modifiersPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, [db, orgId, locId]);
-  const customersPath = useMemoFirebase(() => orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, [db, orgId]);
-  const loyaltyDocRef = useMemo(() => orgId ? doc(db, 'orgs', orgId, 'settings', 'loyalty') : null, [db, orgId]);
+  // Memoización correcta de las queries finales para evitar el error de __memo
+  const menuQuery = useMemoFirebase(() => 
+    orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'menuItems'), orderBy('name', 'asc')) : null, 
+    [db, orgId, locId]
+  );
+  
+  const modifiersQuery = useMemoFirebase(() => 
+    orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, 
+    [db, orgId, locId]
+  );
+  
+  const customersQuery = useMemoFirebase(() => 
+    orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, 
+    [db, orgId]
+  );
+  
+  const loyaltyDocRef = useMemoFirebase(() => 
+    orgId ? doc(db, 'orgs', orgId, 'settings', 'loyalty') : null, 
+    [db, orgId]
+  );
 
-  const { data: menuItems, isLoading: menuLoading } = useCollection<MenuItem>(menuPath ? query(menuPath, orderBy('name', 'asc')) : null);
-  const { data: modifiersData } = useCollection<Modifier>(modifiersPath);
-  const { data: customersData } = useCollection<Customer>(customersPath);
+  const { data: menuItems, isLoading: menuLoading } = useCollection<MenuItem>(menuQuery);
+  const { data: modifiersData } = useCollection<Modifier>(modifiersQuery);
+  const { data: customersData } = useCollection<Customer>(customersQuery);
   const { data: loyaltySettings } = useDoc<LoyaltySettings>(loyaltyDocRef);
 
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
@@ -140,7 +157,6 @@ export default function PosContainer() {
     if (!activeOrder || !orgId || !locId) return;
     const amountToPay = parseFloat(partialAmount) || (activeOrder.total - activeOrder.paidAmount);
     
-    // Cálculo de comisión de tarjeta: monto - (monto * 4.06%)
     const netAmount = method === 'card' 
       ? amountToPay * (1 - CARD_COMMISSION_RATE) 
       : amountToPay;

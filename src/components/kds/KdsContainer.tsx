@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Clock, CheckCircle, Flame, ChefHat, Bell, Loader2, ArrowLeft } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useTenant, useMemoFirebase } from '@/firebase';
 import { collection, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
@@ -24,21 +24,20 @@ export default function KdsContainer() {
   const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const { orgId, locId } = useTenant();
   
-  // Simplificamos la query para evitar problemas de índices compuestos en el prototipo
-  // Traemos todos y filtramos los "servidos" en el lado del cliente para máxima estabilidad
-  const ticketsQuery = useMemo(() => 
-    query(
-      collection(db, 'tickets'), 
+  // Query multi-tenant correcta y memoizada para evitar errores de permisos/hidratación
+  const ticketsQuery = useMemoFirebase(() => 
+    orgId && locId ? query(
+      collection(db, 'orgs', orgId, 'locations', locId, 'kitchenTickets'), 
       orderBy('timestamp', 'asc')
-    ), [db]
+    ) : null, [db, orgId, locId]
   );
 
-  const { data: allTickets, loading } = useCollection<KitchenTicket>(ticketsQuery);
+  const { data: allTickets, isLoading } = useCollection<KitchenTicket>(ticketsQuery);
 
-  // Filtrar tickets que no han sido servidos aún
   const tickets = useMemo(() => 
-    allTickets.filter(t => t.status !== 'served'), 
+    allTickets ? allTickets.filter(t => t.status !== 'served') : [], 
     [allTickets]
   );
 
@@ -52,12 +51,13 @@ export default function KdsContainer() {
   }, []);
 
   const updateTicketStatus = async (ticketId: string, nextStatus: TicketStatus) => {
+    if (!orgId || !locId) return;
     try {
-      const ticketRef = doc(db, 'tickets', ticketId);
+      const ticketRef = doc(db, 'orgs', orgId, 'locations', locId, 'kitchenTickets', ticketId);
       await updateDoc(ticketRef, { status: nextStatus });
-      toast({ title: 'Estado Actualizado', description: `El ticket ahora está ${STATUS_CONFIG[nextStatus].label}.` });
+      toast({ title: 'Estado Actualizado' });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
+      toast({ variant: 'destructive', title: 'Error' });
     }
   };
 
@@ -82,22 +82,22 @@ export default function KdsContainer() {
           </Button>
           <div className="flex items-center gap-3">
             <ChefHat className="h-8 w-8" />
-            <h1 className="text-2xl font-bold">Pantalla de Cocina (KDS)</h1>
+            <h1 className="text-2xl font-bold">Cocina (KDS)</h1>
           </div>
         </div>
         <div className="flex gap-4">
           <Badge className="bg-white/20 text-white border-none text-lg px-4 py-1">
             Activos: {tickets.length}
           </Badge>
-          <div className="text-right hidden md:block">
-            <div className="font-bold text-lg">Estación Principal</div>
-            <div className="text-xs opacity-70">Sincronizado en tiempo real</div>
-          </div>
         </div>
       </header>
 
       <ScrollArea className="flex-1 p-6">
-        {loading ? (
+        {!locId ? (
+          <div className="flex h-64 items-center justify-center opacity-40">
+            <p className="text-xl font-bold italic">Seleccione una sucursal para ver los pedidos</p>
+          </div>
+        ) : isLoading ? (
           <div className="flex h-64 items-center justify-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
           </div>
@@ -105,7 +105,6 @@ export default function KdsContainer() {
           <div className="flex h-64 flex-col items-center justify-center text-muted-foreground opacity-50">
             <ChefHat className="h-20 w-20 mb-4" />
             <p className="text-xl font-bold">¡Cocina despejada!</p>
-            <p>No hay pedidos pendientes por ahora.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -113,15 +112,13 @@ export default function KdsContainer() {
               <Card key={ticket.id} className={`overflow-hidden border-2 flex flex-col h-[400px] shadow-sm ${ticket.status === 'new' ? 'border-primary animate-pulse' : 'border-border'}`}>
                 <CardHeader className={`${STATUS_CONFIG[ticket.status].color} py-3 px-4 flex-row justify-between items-center space-y-0`}>
                   <div>
-                    <CardTitle className="text-lg flex items-center gap-2">
+                    <CardTitle className="text-lg">
                       #{ticket.orderId.split('-')[1] || ticket.orderId}
                     </CardTitle>
                     <p className="text-[10px] font-semibold opacity-80 uppercase tracking-wider">{ticket.serviceType}</p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold flex items-center gap-1 justify-end">
-                      <Clock className="h-3 w-3" /> {getElapsedTime(ticket.timestamp)}
-                    </div>
+                  <div className="text-sm font-bold flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> {getElapsedTime(ticket.timestamp)}
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 p-4 overflow-hidden">
@@ -158,7 +155,7 @@ export default function KdsContainer() {
                       className="bg-primary hover:bg-primary/90 text-white font-bold h-12 text-lg" 
                       onClick={() => updateTicketStatus(ticket.id!, 'preparing')}
                     >
-                      Empezar a Cocinar
+                      Empezar
                     </Button>
                   )}
                   {ticket.status === 'preparing' && (
@@ -166,7 +163,7 @@ export default function KdsContainer() {
                       className="bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg"
                       onClick={() => updateTicketStatus(ticket.id!, 'ready')}
                     >
-                      Marcar como Listo
+                      Listo
                     </Button>
                   )}
                   {ticket.status === 'ready' && (
@@ -174,7 +171,7 @@ export default function KdsContainer() {
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 text-lg"
                       onClick={() => updateTicketStatus(ticket.id!, 'served')}
                     >
-                      Marcar como Servido
+                      Servir
                     </Button>
                   )}
                 </CardFooter>

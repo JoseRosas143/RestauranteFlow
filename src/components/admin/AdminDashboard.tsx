@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -27,21 +28,48 @@ export default function AdminDashboard() {
   const router = useRouter();
   const { orgId, locId, setLoc } = useTenant();
 
-  // Queries segmentadas por Multi-Tenant
-  const menuPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'menuItems') : null, [db, orgId, locId]);
-  const categoriesPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'categories') : null, [db, orgId, locId]);
-  const modifiersPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, [db, orgId, locId]);
-  const discountsPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'discounts') : null, [db, orgId, locId]);
-  const customersPath = useMemoFirebase(() => orgId ? collection(db, 'orgs', orgId, 'customers') : null, [db, orgId]);
-  const usersPath = useMemoFirebase(() => orgId ? collection(db, 'orgs', orgId, 'users') : null, [db, orgId]);
-  const locationDocRef = useMemo(() => orgId && locId ? doc(db, 'orgs', orgId, 'locations', locId) : null, [db, orgId, locId]);
+  // Queries finales memoizadas para evitar errores de __memo
+  const itemsQuery = useMemoFirebase(() => 
+    orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'menuItems'), orderBy('name', 'asc')) : null, 
+    [db, orgId, locId]
+  );
+  
+  const categoriesQuery = useMemoFirebase(() => 
+    orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), orderBy('name', 'asc')) : null, 
+    [db, orgId, locId]
+  );
+  
+  const modifiersQuery = useMemoFirebase(() => 
+    orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, 
+    [db, orgId, locId]
+  );
+  
+  const discountsQuery = useMemoFirebase(() => 
+    orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'discounts') : null, 
+    [db, orgId, locId]
+  );
+  
+  const customersQuery = useMemoFirebase(() => 
+    orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, 
+    [db, orgId]
+  );
+  
+  const usersQuery = useMemoFirebase(() => 
+    orgId ? collection(db, 'orgs', orgId, 'users') : null, 
+    [db, orgId]
+  );
+  
+  const locationDocRef = useMemoFirebase(() => 
+    orgId && locId ? doc(db, 'orgs', orgId, 'locations', locId) : null, 
+    [db, orgId, locId]
+  );
 
-  const { data: items } = useCollection<MenuItem>(menuPath ? query(menuPath, orderBy('name', 'asc')) : null);
-  const { data: categories } = useCollection<Category>(categoriesPath ? query(categoriesPath, orderBy('name', 'asc')) : null);
-  const { data: modifiers } = useCollection<Modifier>(modifiersPath);
-  const { data: discounts } = useCollection<Discount>(discountsPath);
-  const { data: customers } = useCollection<Customer>(customersPath ? query(customersPath, orderBy('name', 'asc')) : null);
-  const { data: staffUsers } = useCollection<UserProfile>(usersPath);
+  const { data: items } = useCollection<MenuItem>(itemsQuery);
+  const { data: categories } = useCollection<Category>(categoriesQuery);
+  const { data: modifiers } = useCollection<Modifier>(modifiersQuery);
+  const { data: discounts } = useCollection<Discount>(discountsQuery);
+  const { data: customers } = useCollection<Customer>(customersQuery);
+  const { data: staffUsers } = useCollection<UserProfile>(usersQuery);
   const { data: currentLocationData } = useDoc<Location>(locationDocRef);
 
   useEffect(() => {
@@ -66,7 +94,7 @@ export default function AdminDashboard() {
              {currentLocationData?.logo && <img src={currentLocationData.logo} className="h-10 w-10 rounded-md object-cover" alt="Logo" />}
              <div>
                 <h1 className="text-3xl font-bold text-primary">RestauranteFlow Admin</h1>
-                <p className="text-muted-foreground">{currentLocationData?.name || 'Sucursal'} • Gestión de Catálogo y Configuración</p>
+                <p className="text-muted-foreground">{currentLocationData?.name || 'Sucursal'} • Gestión de Catálogo</p>
              </div>
           </div>
         </div>
@@ -311,8 +339,12 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Configuración de Lealtad
-  const loyaltyDocRef = useMemo(() => doc(db, 'orgs', orgId, 'settings', 'loyalty'), [db, orgId]);
+  // Configuración de Lealtad memoizada
+  const loyaltyDocRef = useMemoFirebase(() => 
+    orgId ? doc(db, 'orgs', orgId, 'settings', 'loyalty') : null, 
+    [db, orgId]
+  );
+  
   const { data: loyaltySettings } = useDoc<LoyaltySettings>(loyaltyDocRef);
   const [newPercentage, setNewPercentage] = useState<string>('');
 
@@ -321,6 +353,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
   }, [loyaltySettings]);
 
   const saveLoyaltySettings = async () => {
+    if (!loyaltyDocRef) return;
     try {
       await setDoc(loyaltyDocRef, { pointsPercentage: Number(newPercentage) });
       toast({ title: "Configuración Guardada" });
@@ -375,7 +408,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
         <CardHeader className="flex flex-row justify-between items-center">
           <div>
             <CardTitle>Clientes</CardTitle>
-            <CardDescription>Base de datos de fidelización</CardDescription>
+            <CardDescription>Fidelización</CardDescription>
           </div>
           <Button size="icon" variant="outline" onClick={() => { setSelectedCustomer(null); setIsEditing(false); setCustomerForm(initialCustomer); }}>
             <Plus className="h-4 w-4" />
@@ -385,7 +418,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
           <div className="mb-4 space-y-4">
             <div className="p-3 bg-primary/5 rounded-xl border border-primary/20 space-y-2">
               <div className="flex items-center gap-2 font-bold text-xs uppercase text-primary">
-                <Settings className="h-3 w-3" /> Configuración de Puntos
+                <Settings className="h-3 w-3" /> Puntos
               </div>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -400,7 +433,6 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
                 </div>
                 <Button size="sm" onClick={saveLoyaltySettings}>Set</Button>
               </div>
-              <p className="text-[10px] text-muted-foreground">Porcentaje de la venta total que se convierte en puntos.</p>
             </div>
           </div>
           <ScrollArea className="h-[500px]">
@@ -431,7 +463,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
                 <Button variant="ghost" size="icon" className="text-white" onClick={() => setSelectedCustomer(null)}>
                   <ArrowLeft className="h-6 w-6" />
                 </Button>
-                <h2 className="text-xl font-bold">Perfil del cliente</h2>
+                <h2 className="text-xl font-bold">Perfil</h2>
               </div>
             </div>
 
@@ -446,7 +478,6 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
               <div className="space-y-6 max-w-md mx-auto">
                 <div className="flex items-center gap-4"><Mail className="h-5 w-5 opacity-60" /><span>{selectedCustomer.email || 'Sin correo'}</span></div>
                 <div className="flex items-center gap-4"><Phone className="h-5 w-5 opacity-60" /><span>{selectedCustomer.phone}</span></div>
-                <div className="flex items-center gap-4"><MapPin className="h-5 w-5 opacity-60" /><span>{selectedCustomer.city || 'Ciudad no especificada'}</span></div>
 
                 <div className="grid grid-cols-3 gap-6 pt-6 border-t border-white/10">
                   <div className="flex flex-col items-center gap-1">
@@ -462,7 +493,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
                   <div className="flex flex-col items-center gap-1">
                     <Calendar className="h-5 w-5 text-blue-500" />
                     <div className="font-bold">{selectedCustomer.lastVisit ? new Date(selectedCustomer.lastVisit).toLocaleDateString() : 'Nunca'}</div>
-                    <div className="text-[10px] opacity-50">Última visita</div>
+                    <div className="text-[10px] opacity-50">Última</div>
                   </div>
                 </div>
               </div>
@@ -479,13 +510,13 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
               <div className="space-y-2"><Label className="text-zinc-400">Nombre Completo *</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} /></div>
               <div className="space-y-2"><Label className="text-zinc-400">WhatsApp *</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} /></div>
               <div className="space-y-2"><Label className="text-zinc-400">Email</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} /></div>
-              <div className="space-y-2"><Label className="text-zinc-400">Fecha Nacimiento</Label><Input type="date" className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.birthday} onChange={e => setCustomerForm({...customerForm, birthday: e.target.value})} /></div>
+              <div className="space-y-2"><Label className="text-zinc-400">Cumpleaños</Label><Input type="date" className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.birthday} onChange={e => setCustomerForm({...customerForm, birthday: e.target.value})} /></div>
             </div>
             <div className="space-y-4 pt-4">
                <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsMarketing} onCheckedChange={v => setCustomerForm({...customerForm, acceptsMarketing: v})} /><Label className="text-sm text-zinc-300">Acepto recibir publicidad</Label></div>
                <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsTerms} onCheckedChange={v => setCustomerForm({...customerForm, acceptsTerms: v})} /><Label className="text-sm text-zinc-300">Acepto términos y condiciones *</Label></div>
             </div>
-            <Button className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black" onClick={handleSaveCustomer} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />}{isEditing ? 'ACTUALIZAR DATOS' : 'REGISTRAR CLIENTE'}</Button>
+            <Button className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black" onClick={handleSaveCustomer} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />}{isEditing ? 'ACTUALIZAR' : 'REGISTRAR'}</Button>
           </div>
         )}
       </Card>
@@ -601,7 +632,7 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
   };
 
   const resetAnalytics = async () => {
-    if (!confirm("¿Seguro que deseas resetear todas las analíticas diarias de esta sucursal?")) return;
+    if (!confirm("¿Seguro que deseas resetear todas las analíticas de esta sucursal?")) return;
     setLoading(true);
     try {
       const path = collection(db, 'orgs', orgId, 'locations', locId, 'analytics', 'daily', 'days');
@@ -643,9 +674,8 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      {/* Datos de la Sucursal */}
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Store className="h-5 w-5" /> Datos de la Sucursal</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Store className="h-5 w-5" /> Sucursal</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-xl bg-muted border-2 border-dashed flex items-center justify-center overflow-hidden relative">
@@ -655,42 +685,40 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
                 <ImageIcon className="opacity-20" />
               )}
             </div>
-            <Button variant="outline" onClick={() => document.getElementById('logo-up')?.click()}><Upload className="mr-2 h-4 w-4" /> Cambiar Logo</Button>
+            <Button variant="outline" onClick={() => document.getElementById('logo-up')?.click()}><Upload className="mr-2 h-4 w-4" /> Logo</Button>
             <input id="logo-up" type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
           </div>
-          <div className="space-y-2"><Label>Nombre del Establecimiento</Label><Input value={locForm.name} onChange={e => setLocForm({...locForm, name: e.target.value})} /></div>
-          <div className="space-y-2"><Label>Ubicación / Dirección</Label><Input value={locForm.address} onChange={e => setLocForm({...locForm, address: e.target.value})} /></div>
-          <Button className="w-full" onClick={saveLocationDetails} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Sucursal</Button>
+          <div className="space-y-2"><Label>Nombre</Label><Input value={locForm.name} onChange={e => setLocForm({...locForm, name: e.target.value})} /></div>
+          <div className="space-y-2"><Label>Dirección</Label><Input value={locForm.address} onChange={e => setLocForm({...locForm, address: e.target.value})} /></div>
+          <Button className="w-full" onClick={saveLocationDetails} disabled={loading}>Guardar</Button>
         </CardContent>
       </Card>
 
-      {/* Gestión de Roles de Usuario */}
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5" /> Usuarios y Roles</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5" /> Staff</CardTitle></CardHeader>
         <CardContent className="space-y-6">
           <div className="p-4 border rounded-xl bg-muted/20 space-y-4">
-            <Label className="font-bold">Añadir Staff</Label>
             <div className="grid grid-cols-2 gap-2">
               <Input placeholder="Nombre" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
               <Select value={newUser.role} onValueChange={(v: UserRole) => setNewUser({...newUser, role: v})}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="manager">Gerente</SelectItem>
                   <SelectItem value="cashier">Cajero</SelectItem>
                   <SelectItem value="kitchen">Cocina</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" className="w-full" onClick={addUser}>Añadir al Equipo</Button>
+            <Button variant="outline" className="w-full" onClick={addUser}>Añadir</Button>
           </div>
           <ScrollArea className="h-[200px]">
             <div className="space-y-2">
               {staff.map(u => (
                 <div key={u.uid} className="flex justify-between items-center p-3 border rounded-lg">
                   <div>
-                    <div className="font-bold text-sm">{u.name || 'Sin nombre'}</div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{u.role}</div>
+                    <div className="font-bold text-sm">{u.name}</div>
+                    <div className="text-[10px] uppercase">{u.role}</div>
                   </div>
                   <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.uid))}><Trash2 className="h-4 w-4" /></Button>
                 </div>
@@ -700,17 +728,10 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
         </CardContent>
       </Card>
 
-      {/* Mantenimiento */}
       <Card className="border-destructive/20 bg-destructive/5">
-        <CardHeader><CardTitle className="flex items-center gap-2 text-destructive"><ShieldAlert className="h-5 w-5" /> Zona de Peligro</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="font-bold">Resetear Analíticas</div>
-              <div className="text-xs text-muted-foreground">Elimina permanentemente los datos de ventas diarias.</div>
-            </div>
-            <Button variant="destructive" onClick={resetAnalytics} disabled={loading}><RefreshCw className="mr-2 h-4 w-4" /> Resetear</Button>
-          </div>
+        <CardHeader><CardTitle className="text-destructive">Peligro</CardTitle></CardHeader>
+        <CardContent>
+          <Button variant="destructive" className="w-full" onClick={resetAnalytics} disabled={loading}><RefreshCw className="mr-2 h-4 w-4" /> Resetear Analíticas</Button>
         </CardContent>
       </Card>
     </div>

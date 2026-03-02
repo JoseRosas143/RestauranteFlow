@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { ShoppingCart, Utensils, BarChart3, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,18 +13,18 @@ export default function Home() {
       color: 'bg-primary/10',
     },
     {
-      title: 'Pantalla de Cocina (KDS)',
-      description: 'Monitorea tickets y sigue la preparación.',
+      title: 'Cocina (KDS)',
+      description: 'Monitorea tickets y preparación.',
       icon: <Utensils className="h-8 w-8 text-accent" />,
       href: '/kds',
       color: 'bg-accent/10',
     },
     {
-      title: 'Panel de Administración',
-      description: 'Revisa métricas de ventas y configuración.',
-      icon: <BarChart3 className="h-8 w-8 text-blue-600" />,
+      title: 'Administración',
+      description: 'Métricas, catálogo y configuración.',
+      icon: <BarChart3 className="h-8 w-8 text-primary" />,
       href: '/admin',
-      color: 'bg-blue-50',
+      color: 'bg-primary/10',
     },
   ];
 
@@ -32,7 +33,7 @@ export default function Home() {
       <div className="text-center space-y-4">
         <h1 className="text-5xl font-bold tracking-tight text-primary">RestauranteFlow</h1>
         <p className="text-xl text-muted-foreground max-w-2xl">
-          El flujo perfecto para tu negocio gastronómico. Pedidos eficientes, multi-sucursal y análisis profundo.
+          El flujo perfecto para tu negocio gastronómico. Eficiente, multi-sucursal y profesional.
         </p>
       </div>
 
@@ -40,7 +41,7 @@ export default function Home() {
         {modules.map((module) => (
           <Link key={module.href} href={module.href} className="group">
             <Card className="h-full border-2 border-transparent transition-all group-hover:border-primary group-hover:shadow-xl group-hover:-translate-y-1 overflow-hidden">
-              <div className={`h-2 w-full ${module.title === 'Terminal POS' ? 'bg-primary' : module.title === 'Pantalla de Cocina (KDS)' ? 'bg-accent' : 'bg-blue-600'}`} />
+              <div className={`h-2 w-full ${module.title === 'Cocina (KDS)' ? 'bg-accent' : 'bg-primary'}`} />
               <CardHeader>
                 <div className={`p-3 rounded-xl w-fit mb-4 ${module.color}`}>
                   {module.icon}
@@ -59,7 +60,7 @@ export default function Home() {
       </div>
 
       <footer className="text-muted-foreground text-sm opacity-60">
-        &copy; {new Date().getFullYear()} RestauranteFlow. Diseñado para la excelencia en el servicio.
+        &copy; {new Date().getFullYear()} RestauranteFlow.
       </footer>
     </div>
   );
