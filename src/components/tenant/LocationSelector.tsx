@@ -5,13 +5,6 @@ import React, { useEffect, useState } from 'react';
 import { useTenant, useFirestore } from '@/firebase';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { Location } from '@/lib/types';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { MapPin, Store, ArrowRight, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,7 +29,6 @@ export default function LocationSelector() {
         const snap = await getDocs(locsRef);
         const allLocs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Location));
         
-        // Si hay una lista de sucursales permitidas, filtramos. Si está vacía (admin), mostramos todas.
         const filtered = allowedLocs && allowedLocs.length > 0 
           ? allLocs.filter(l => allowedLocs.includes(l.id))
           : allLocs;
@@ -86,6 +78,8 @@ export default function LocationSelector() {
     }
   };
 
+  // Si no hay orgId, no mostramos nada para evitar el pantallazo blanco,
+  // pero el AdminPage manejará el error visual.
   if (!orgId) return null;
 
   if (locId) {
@@ -97,7 +91,7 @@ export default function LocationSelector() {
         </div>
         <div className="flex flex-col">
           <span className="text-[10px] font-black uppercase text-muted-foreground leading-none">Sucursal Activa</span>
-          <span className="text-sm font-black tracking-tight">{current?.name || 'Cargando...'}</span>
+          <span className="text-sm font-black tracking-tight">{current?.name || 'Sincronizando...'}</span>
         </div>
         <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] font-black uppercase hover:bg-primary hover:text-white rounded-xl" onClick={() => setLoc(null)}>Cambiar</Button>
       </div>
