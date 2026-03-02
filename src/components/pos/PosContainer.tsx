@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MenuItem, Order, Payment, OrderItem, ServiceType, Modifier, ModifierOption, Customer, LoyaltySettings } from '@/lib/types';
 import { 
-  Plus, Minus, Trash2, CreditCard, Banknote, X, ShoppingCart, 
+  Plus, Minus, Trash2, CreditCard, Banknote, X, ShoppingBag, 
   RefreshCw, ArrowLeft, User, MessageSquare, Save, Wallet, Search, Loader2 
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,16 +23,15 @@ import { collection, doc, runTransaction, query, orderBy, setDoc, increment, add
 import LocationSelector from '@/components/tenant/LocationSelector';
 
 const TAX_RATE = 0.08;
+const CARD_COMMISSION_RATE = 0.0406; // 4.06%
 
 export default function PosContainer() {
   const db = useFirestore();
   const router = useRouter();
   const { orgId, locId } = useTenant();
   
-  // Queries segmentadas por Multi-Tenant
   const menuPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'menuItems') : null, [db, orgId, locId]);
   const modifiersPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, [db, orgId, locId]);
-  const discountsPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'discounts') : null, [db, orgId, locId]);
   const customersPath = useMemo(() => orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, [db, orgId]);
   const loyaltyDocRef = useMemo(() => orgId ? doc(db, 'orgs', orgId, 'settings', 'loyalty') : null, [db, orgId]);
 
@@ -47,7 +46,6 @@ export default function PosContainer() {
   const [selectedItemForMod, setSelectedItemForMod] = useState<MenuItem | null>(null);
   const [tempModifiers, setTempModifiers] = useState<ModifierOption[]>([]);
   const [tempNotes, setTempNotes] = useState('');
-  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [partialAmount, setPartialAmount] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -108,7 +106,6 @@ export default function PosContainer() {
     return { ...order, subtotal, tax, total: subtotal - order.discountAmount + tax };
   };
 
-  // Operación Atómica: Confirmar Pedido y Generar Ticket
   const confirmToKitchen = async () => {
     if (!activeOrder || activeOrder.items.length === 0 || !orgId || !locId) return;
     setLoading(true);
@@ -140,10 +137,15 @@ export default function PosContainer() {
     }
   };
 
-  // Pago y Actualización Atómica de Analíticas
   const handlePayment = async (method: 'cash' | 'card' | 'transfer') => {
     if (!activeOrder || !orgId || !locId) return;
     const amountToPay = parseFloat(partialAmount) || (activeOrder.total - activeOrder.paidAmount);
+    
+    // Cálculo de comisión de tarjeta: monto - (monto * 4.06%)
+    const netAmount = method === 'card' 
+      ? amountToPay * (1 - CARD_COMMISSION_RATE) 
+      : amountToPay;
+
     const newPaidAmount = activeOrder.paidAmount + amountToPay;
     const isFullyPaid = newPaidAmount >= activeOrder.total - 0.01;
     const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
@@ -151,19 +153,18 @@ export default function PosContainer() {
     setLoading(true);
     try {
       await runTransaction(db, async (transaction) => {
-        // 1. Puntos de Lealtad
         if (isFullyPaid && activeOrder.customerId) {
           const custRef = doc(db, 'orgs', orgId, 'customers', activeOrder.customerId);
           const pts = activeOrder.total * ((loyaltySettings?.pointsPercentage || 10) / 100);
           transaction.update(custRef, { points: increment(pts), totalVisits: increment(1), lastVisit: Date.now() });
         }
 
-        // 2. Analíticas Diarias
         const analyticsRef = doc(db, 'orgs', orgId, 'locations', locId, 'analytics', 'daily', 'days', today);
         const analyticsSnap = await transaction.get(analyticsRef);
         
-        const data = analyticsSnap.exists() ? analyticsSnap.data() : { totalRevenue: 0, totalOrders: 0, items: {} };
+        const data = analyticsSnap.exists() ? analyticsSnap.data() : { totalRevenue: 0, netRevenue: 0, totalOrders: 0, items: {} };
         const updatedItems = { ...data.items };
+        
         if (isFullyPaid) {
           activeOrder.items.forEach(item => {
             const current = updatedItems[item.menuItemId] || { quantity: 0, revenue: 0 };
@@ -174,6 +175,7 @@ export default function PosContainer() {
           });
           transaction.set(analyticsRef, {
             totalRevenue: increment(activeOrder.total),
+            netRevenue: increment(netAmount),
             totalOrders: increment(1),
             items: updatedItems
           }, { merge: true });
@@ -184,7 +186,13 @@ export default function PosContainer() {
         if (!prev) return null;
         return {
           ...prev,
-          payments: [...prev.payments, { id: `PAG-${Date.now()}`, amount: amountToPay, method, timestamp: Date.now() }],
+          payments: [...prev.payments, { 
+            id: `PAG-${Date.now()}`, 
+            amount: amountToPay, 
+            netAmount, 
+            method, 
+            timestamp: Date.now() 
+          }],
           paidAmount: newPaidAmount,
           status: isFullyPaid ? 'paid' : prev.status
         };
@@ -192,7 +200,7 @@ export default function PosContainer() {
       setPartialAmount('');
       if (isFullyPaid) {
         setPaymentDialogOpen(false);
-        toast({ title: 'Venta Finalizada' });
+        toast({ title: 'Venta Finalizada', description: method === 'card' ? `Neto recibido: $${netAmount.toFixed(2)}` : '' });
       }
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error en pago' });
@@ -212,7 +220,7 @@ export default function PosContainer() {
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => router.push('/')}><ArrowLeft className="h-6 w-6 text-primary" /></Button>
             <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
-              <ShoppingCart className="h-6 w-6" /> ChoripanFlow POS
+              <ShoppingBag className="h-6 w-6" /> RestauranteFlow POS
             </h1>
           </div>
           <div className="flex gap-4 items-center">
@@ -232,17 +240,24 @@ export default function PosContainer() {
         </div>
 
         <ScrollArea className="flex-1 pr-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
-            {menuItems.map((item) => (
-              <Card key={item.id} className="cursor-pointer hover:shadow-lg transition-all border-2 border-transparent active:border-primary overflow-hidden group" onClick={() => openModifierDialog(item)}>
-                <div className="relative h-32 w-full bg-muted">
-                  {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center opacity-20"><ShoppingCart /></div>}
-                  <div className="absolute top-2 right-2"><Badge className="bg-primary/90 text-white font-bold">${item.price.toFixed(2)}</Badge></div>
-                </div>
-                <CardHeader className="p-3"><CardTitle className="text-sm truncate font-bold">{item.name}</CardTitle></CardHeader>
-              </Card>
-            ))}
-          </div>
+          {!locId ? (
+            <div className="h-full flex flex-col items-center justify-center opacity-40">
+              <Search className="h-20 w-20 mb-4" />
+              <h2 className="text-2xl font-bold italic">Seleccione una sucursal para comenzar</h2>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+              {menuItems.map((item) => (
+                <Card key={item.id} className="cursor-pointer hover:shadow-lg transition-all border-2 border-transparent active:border-primary overflow-hidden group" onClick={() => openModifierDialog(item)}>
+                  <div className="relative h-32 w-full bg-muted">
+                    {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center opacity-20"><ShoppingBag /></div>}
+                    <div className="absolute top-2 right-2"><Badge className="bg-primary/90 text-white font-bold">${item.price.toFixed(2)}</Badge></div>
+                  </div>
+                  <CardHeader className="p-3"><CardTitle className="text-sm truncate font-bold">{item.name}</CardTitle></CardHeader>
+                </Card>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </div>
 
@@ -270,7 +285,7 @@ export default function PosContainer() {
 
         <div className="p-6 bg-muted/40 space-y-3 border-t">
           <div className="flex justify-between text-2xl font-black"><span>TOTAL</span><span className="text-primary">${activeOrder?.total.toFixed(2)}</span></div>
-          <Button size="lg" className="w-full h-16 text-xl font-black" onClick={activeOrder?.status === 'draft' ? confirmToKitchen : () => setPaymentDialogOpen(true)} disabled={loading}>
+          <Button size="lg" className="w-full h-16 text-xl font-black" onClick={activeOrder?.status === 'draft' ? confirmToKitchen : () => setPaymentDialogOpen(true)} disabled={loading || !locId}>
             {loading ? <Loader2 className="animate-spin" /> : (activeOrder?.status === 'draft' ? 'ENVIAR A COCINA' : 'COBRAR')}
           </Button>
         </div>
@@ -303,7 +318,11 @@ export default function PosContainer() {
           <div className="space-y-6 py-4">
             <div className="grid grid-cols-3 gap-3">
               <Button variant="outline" className="h-24 flex-col" onClick={() => handlePayment('cash')}><Banknote className="h-8 w-8 text-green-600" />Efectivo</Button>
-              <Button variant="outline" className="h-24 flex-col" onClick={() => handlePayment('card')}><CreditCard className="h-8 w-8 text-blue-600" />Tarjeta</Button>
+              <Button variant="outline" className="h-24 flex-col" onClick={() => handlePayment('card')}>
+                <CreditCard className="h-8 w-8 text-blue-600" />
+                Tarjeta
+                <span className="text-[10px] opacity-50">-4.06% Com.</span>
+              </Button>
               <Button variant="outline" className="h-24 flex-col" onClick={() => handlePayment('transfer')}><Wallet className="h-8 w-8 text-purple-600" />Transf.</Button>
             </div>
             <Input type="number" placeholder="Monto parcial..." value={partialAmount} onChange={e => setPartialAmount(e.target.value)} className="text-2xl h-14 font-black" />
