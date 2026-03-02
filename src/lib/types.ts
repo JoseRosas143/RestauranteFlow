@@ -33,11 +33,20 @@ export interface Discount {
 export interface Customer {
   id?: string;
   name: string;
-  phone?: string;
+  phone: string;
   email?: string;
+  birthday?: string;
+  city?: string;
+  acceptsMarketing: boolean;
+  acceptsTerms: boolean;
   points: number;
   totalVisits: number;
   lastVisit: number;
+  createdAt: number;
+}
+
+export interface LoyaltySettings {
+  pointsPercentage: number; // Porcentaje de la venta que se convierte a puntos (ej: 5 para 5%)
 }
 
 export interface MenuItem {

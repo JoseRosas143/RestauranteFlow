@@ -2,10 +2,10 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { MenuItem, Order, Payment, OrderItem, ServiceType, Modifier, ModifierOption, Customer, Discount } from '@/lib/types';
+import { MenuItem, Order, Payment, OrderItem, ServiceType, Modifier, ModifierOption, Customer, Discount, LoyaltySettings } from '@/lib/types';
 import { 
   Plus, Minus, Trash2, CreditCard, Banknote, CheckCircle2, X, ShoppingCart, 
-  RefreshCw, ArrowLeft, User, MapPin, Tag, MessageSquare, Save, Wallet, Search 
+  RefreshCw, ArrowLeft, User, MapPin, Tag, MessageSquare, Save, Wallet, Search, Loader2 
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useDoc } from '@/firebase';
 import { collection, addDoc, query, orderBy, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 
 const TAX_RATE = 0.08;
@@ -27,16 +27,17 @@ export default function PosContainer() {
   const db = useFirestore();
   const router = useRouter();
   
-  // Memorizar consultas para evitar re-suscripciones infinitas
   const menuQuery = useMemo(() => query(collection(db, 'menu'), orderBy('name', 'asc')), [db]);
   const modifiersQuery = useMemo(() => collection(db, 'modifiers'), [db]);
-  const customersQuery = useMemo(() => collection(db, 'customers'), [db]);
+  const customersQuery = useMemo(() => query(collection(db, 'customers'), orderBy('name', 'asc')), [db]);
   const discountsQuery = useMemo(() => collection(db, 'discounts'), [db]);
+  const loyaltyDocRef = useMemo(() => doc(db, 'settings', 'loyalty'), [db]);
 
   const { data: menuItems } = useCollection<MenuItem>(menuQuery);
   const { data: modifiersData } = useCollection<Modifier>(modifiersQuery);
   const { data: customersData } = useCollection<Customer>(customersQuery);
   const { data: discountsData } = useCollection<Discount>(discountsQuery);
+  const { data: loyaltySettings } = useDoc<LoyaltySettings>(loyaltyDocRef);
 
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -47,8 +48,21 @@ export default function PosContainer() {
   const [tempNotes, setTempNotes] = useState('');
   
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [newCustomerMode, setNewCustomerMode] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [partialAmount, setPartialAmount] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+
+  // Formulario nuevo cliente
+  const initialCustomer: Partial<Customer> = {
+    name: '',
+    phone: '',
+    email: '',
+    birthday: '',
+    acceptsMarketing: false,
+    acceptsTerms: false
+  };
+  const [customerForm, setCustomerForm] = useState<Partial<Customer>>(initialCustomer);
 
   function createEmptyOrder(): Order {
     return {
@@ -138,16 +152,30 @@ export default function PosContainer() {
     return { ...order, subtotal, tax, total };
   };
 
-  const applyDiscount = (d: Discount) => {
-    if (!activeOrder) return;
-    let amount = 0;
-    if (d.type === 'porcentaje') {
-      amount = activeOrder.subtotal * (d.value / 100);
-    } else {
-      amount = d.value;
+  const handleRegisterCustomer = async () => {
+    if (!customerForm.name || !customerForm.phone || !customerForm.acceptsTerms) {
+      toast({ variant: 'destructive', title: "Nombre, WhatsApp y Términos son obligatorios" });
+      return;
     }
-    setActiveOrder(prev => prev ? updateOrderTotals({ ...prev, discountAmount: amount }) : null);
-    toast({ title: 'Descuento Aplicado', description: d.name });
+    setLoading(true);
+    try {
+      const docRef = await addDoc(collection(db, 'customers'), {
+        ...customerForm,
+        points: 0,
+        totalVisits: 0,
+        lastVisit: 0,
+        createdAt: Date.now()
+      });
+      setActiveOrder(prev => prev ? ({ ...prev, customerId: docRef.id }) : null);
+      setCustomerDialogOpen(false);
+      setNewCustomerMode(false);
+      setCustomerForm(initialCustomer);
+      toast({ title: "Cliente Registrado", description: "Venta vinculada al nuevo cliente." });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Error al registrar cliente" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const saveTicketOpen = async () => {
@@ -212,7 +240,8 @@ export default function PosContainer() {
     const isFullyPaid = newPaidAmount >= activeOrder.total - 0.01;
 
     if (isFullyPaid && activeOrder.customerId) {
-      const points = Math.floor(activeOrder.total / 10);
+      const percentage = loyaltySettings?.pointsPercentage || 10;
+      const points = (activeOrder.total * (percentage / 100));
       await updateDoc(doc(db, 'customers', activeOrder.customerId), {
         points: increment(points),
         totalVisits: increment(1),
@@ -316,7 +345,7 @@ export default function PosContainer() {
         </ScrollArea>
 
         <div className="grid grid-cols-4 gap-4 bg-white p-4 rounded-xl border shadow-md">
-          <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => setCustomerDialogOpen(true)}>
+          <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => { setCustomerDialogOpen(true); setNewCustomerMode(false); }}>
             <User className="h-5 w-5" />
             <span className="text-[10px] uppercase font-bold">Cliente</span>
           </Button>
@@ -353,7 +382,7 @@ export default function PosContainer() {
                 <User className="h-4 w-4 text-primary" />
                 <span className="text-xs font-bold">{customersData.find(c => c.id === activeOrder.customerId)?.name}</span>
               </div>
-              <Badge className="bg-primary text-[10px]">{customersData.find(c => c.id === activeOrder.customerId)?.points} pts</Badge>
+              <Badge className="bg-primary text-[10px]">{customersData.find(c => c.id === activeOrder.customerId)?.points.toFixed(0)} pts</Badge>
             </div>
           )}
         </div>
@@ -478,32 +507,74 @@ export default function PosContainer() {
 
       <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Buscador de Clientes</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar por nombre o teléfono..." className="pl-10" />
-            </div>
-            <ScrollArea className="h-64 border rounded-md p-2">
-              {customersData.map(c => (
-                <div 
-                  key={c.id} 
-                  className="flex items-center justify-between p-3 border-b last:border-0 hover:bg-muted cursor-pointer rounded-lg"
-                  onClick={() => {
-                    setActiveOrder(prev => prev ? ({...prev, customerId: c.id}) : null);
-                    setCustomerDialogOpen(false);
-                  }}
-                >
-                  <div>
-                    <div className="font-bold">{c.name}</div>
-                    <div className="text-xs text-muted-foreground">Visitas: {c.totalVisits}</div>
+          <DialogHeader>
+            <DialogTitle>{newCustomerMode ? 'Nuevo Registro de Cliente' : 'Buscador de Clientes'}</DialogTitle>
+          </DialogHeader>
+          
+          {!newCustomerMode ? (
+            <div className="space-y-4 py-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar por nombre o teléfono..." className="pl-10" />
+              </div>
+              <ScrollArea className="h-64 border rounded-md p-2">
+                {customersData.map(c => (
+                  <div 
+                    key={c.id} 
+                    className="flex items-center justify-between p-3 border-b last:border-0 hover:bg-muted cursor-pointer rounded-lg"
+                    onClick={() => {
+                      setActiveOrder(prev => prev ? ({...prev, customerId: c.id}) : null);
+                      setCustomerDialogOpen(false);
+                    }}
+                  >
+                    <div>
+                      <div className="font-bold">{c.name}</div>
+                      <div className="text-xs text-muted-foreground">WhatsApp: {c.phone}</div>
+                    </div>
+                    <Badge variant="secondary">{c.points.toFixed(0)} pts</Badge>
                   </div>
-                  <Badge variant="secondary">{c.points} pts</Badge>
+                ))}
+              </ScrollArea>
+              <Button variant="outline" className="w-full border-dashed" onClick={() => setNewCustomerMode(true)}>
+                <Plus className="h-4 w-4 mr-2" /> Nuevo Cliente
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nombre Completo *</Label>
+                <Input value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>WhatsApp (Teléfono) *</Label>
+                <Input value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Cumpleaños</Label>
+                <Input type="date" value={customerForm.birthday} onChange={e => setCustomerForm({...customerForm, birthday: e.target.value})} />
+              </div>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center space-x-2">
+                  <Switch checked={customerForm.acceptsMarketing} onCheckedChange={v => setCustomerForm({...customerForm, acceptsMarketing: v})} />
+                  <Label className="text-xs cursor-pointer" onClick={() => setCustomerForm({...customerForm, acceptsMarketing: !customerForm.acceptsMarketing})}>Acepto recibir publicidad o comentarios</Label>
                 </div>
-              ))}
-            </ScrollArea>
-            <Button variant="outline" className="w-full border-dashed"><Plus className="h-4 w-4 mr-2" /> Nuevo Cliente</Button>
-          </div>
+                <div className="flex items-center space-x-2">
+                  <Switch checked={customerForm.acceptsTerms} onCheckedChange={v => setCustomerForm({...customerForm, acceptsTerms: v})} />
+                  <Label className="text-xs cursor-pointer font-bold" onClick={() => setCustomerForm({...customerForm, acceptsTerms: !customerForm.acceptsTerms})}>Acepto los términos y condiciones *</Label>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button variant="ghost" className="flex-1" onClick={() => setNewCustomerMode(false)}>Volver</Button>
+                <Button className="flex-1 font-bold" onClick={handleRegisterCustomer} disabled={loading}>
+                  {loading ? <Loader2 className="animate-spin" /> : 'REGISTRAR'}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
