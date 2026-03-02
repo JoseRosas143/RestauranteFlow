@@ -196,10 +196,18 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
     try {
       const { id, ...itemData } = newItem;
       const cleanData = {
-        ...itemData,
+        name: itemData.name || '',
         price: Number(itemData.price || 0),
         cost: Number(itemData.cost || 0),
+        category: itemData.category || '',
+        soldBy: itemData.soldBy || 'unidad',
+        trackInventory: !!itemData.trackInventory,
         inventoryCount: itemData.trackInventory ? Number(itemData.inventoryCount || 0) : 0,
+        tpvColor: itemData.tpvColor || '#B8732E',
+        tpvShape: itemData.tpvShape || 'cuadrado',
+        reference: itemData.reference || '',
+        barcode: itemData.barcode || '',
+        image: itemData.image || '',
         updatedAt: Date.now()
       };
 
@@ -299,7 +307,7 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
           </div>
           <div className="flex items-center justify-between p-3 border rounded-lg">
             <Label>Inventario</Label>
-            <Switch checked={newItem.trackInventory || false} onCheckedChange={v => setNewItem({...newItem, trackInventory: v})} />
+            <Switch checked={!!newItem.trackInventory} onCheckedChange={v => setNewItem({...newItem, trackInventory: v})} />
           </div>
           {newItem.trackInventory && <Input type="number" placeholder="Stock disponible" value={newItem.inventoryCount ?? ''} onChange={e => setNewItem({...newItem, inventoryCount: Number(e.target.value)})} />}
           
@@ -353,13 +361,13 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
   const [newPercentage, setNewPercentage] = useState<string>('');
 
   useEffect(() => {
-    if (loyaltySettings) setNewPercentage(loyaltySettings.pointsPercentage.toString());
+    if (loyaltySettings) setNewPercentage(String(loyaltySettings.pointsPercentage || ''));
   }, [loyaltySettings]);
 
   const saveLoyaltySettings = async () => {
     if (!loyaltyDocRef) return;
     try {
-      await setDoc(loyaltyDocRef, { pointsPercentage: Number(newPercentage) });
+      await setDoc(loyaltyDocRef, { pointsPercentage: Number(newPercentage || 0) });
       toast({ title: "Configuración Guardada" });
     } catch (e) {
       toast({ variant: 'destructive', title: "Error al guardar" });
@@ -389,11 +397,25 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
     setLoading(true);
     try {
       const path = collection(db, 'orgs', orgId, 'customers');
+      const cleanData = {
+        name: customerForm.name || '',
+        phone: customerForm.phone || '',
+        email: customerForm.email || '',
+        birthday: customerForm.birthday || '',
+        city: customerForm.city || '',
+        acceptsMarketing: !!customerForm.acceptsMarketing,
+        acceptsTerms: !!customerForm.acceptsTerms,
+        points: Number(customerForm.points || 0),
+        totalVisits: Number(customerForm.totalVisits || 0),
+        lastVisit: Number(customerForm.lastVisit || 0),
+        updatedAt: Date.now()
+      };
+
       if (selectedCustomer && isEditing) {
-        await updateDoc(doc(path, selectedCustomer.id!), customerForm);
+        await updateDoc(doc(path, selectedCustomer.id!), cleanData);
         toast({ title: "Cliente Actualizado" });
       } else {
-        await addDoc(path, { ...customerForm, createdAt: Date.now() });
+        await addDoc(path, { ...cleanData, createdAt: Date.now() });
         toast({ title: "Cliente Registrado" });
       }
       setIsEditing(false);
@@ -451,7 +473,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
                   <div className="font-bold">{c.name}</div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> {c.phone}</div>
                   <div className="flex justify-between items-center mt-2">
-                    <Badge variant="secondary">{c.points.toFixed(2)} pts</Badge>
+                    <Badge variant="secondary">{Number(c.points || 0).toFixed(2)} pts</Badge>
                   </div>
                 </div>
               ))}
@@ -487,12 +509,12 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
                 <div className="grid grid-cols-3 gap-6 pt-6 border-t border-white/10">
                   <div className="flex flex-col items-center gap-1">
                     <Star className="h-5 w-5 text-yellow-500" />
-                    <div className="font-bold">{selectedCustomer.points.toFixed(2)}</div>
+                    <div className="font-bold">{Number(selectedCustomer.points || 0).toFixed(2)}</div>
                     <div className="text-[10px] opacity-50">Puntos</div>
                   </div>
                   <div className="flex flex-col items-center gap-1">
                     <ShoppingBag className="h-5 w-5 text-emerald-500" />
-                    <div className="font-bold">{selectedCustomer.totalVisits}</div>
+                    <div className="font-bold">{selectedCustomer.totalVisits || 0}</div>
                     <div className="text-[10px] opacity-50">Visitas</div>
                   </div>
                   <div className="flex flex-col items-center gap-1">
@@ -518,8 +540,8 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
               <div className="space-y-2"><Label className="text-zinc-400">Cumpleaños</Label><Input type="date" className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.birthday || ''} onChange={e => setCustomerForm({...customerForm, birthday: e.target.value})} /></div>
             </div>
             <div className="space-y-4 pt-4">
-               <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsMarketing || false} onCheckedChange={v => setCustomerForm({...customerForm, acceptsMarketing: v})} /><Label className="text-sm text-zinc-300">Acepto recibir publicidad</Label></div>
-               <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsTerms || false} onCheckedChange={v => setCustomerForm({...customerForm, acceptsTerms: v})} /><Label className="text-sm text-zinc-300">Acepto términos y condiciones *</Label></div>
+               <div className="flex items-center space-x-2"><Switch checked={!!customerForm.acceptsMarketing} onCheckedChange={v => setCustomerForm({...customerForm, acceptsMarketing: v})} /><Label className="text-sm text-zinc-300">Acepto recibir publicidad</Label></div>
+               <div className="flex items-center space-x-2"><Switch checked={!!customerForm.acceptsTerms} onCheckedChange={v => setCustomerForm({...customerForm, acceptsTerms: v})} /><Label className="text-sm text-zinc-300">Acepto términos y condiciones *</Label></div>
             </div>
             <Button className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black" onClick={handleSaveCustomer} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />}{isEditing ? 'ACTUALIZAR' : 'REGISTRAR'}</Button>
           </div>
@@ -539,7 +561,11 @@ function CategoriasManager({ categories, orgId, locId }: { categories: Category[
       <CardContent className="space-y-4">
         <Input value={name || ''} onChange={e => setName(e.target.value)} placeholder="Nombre" />
         <Input type="color" value={color || '#B8732E'} onChange={e => setColor(e.target.value)} className="h-12" />
-        <Button className="w-full" onClick={() => addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), { name, color })}><Plus className="mr-2 h-4 w-4" /> Crear</Button>
+        <Button className="w-full" onClick={() => {
+          if (!name) return;
+          addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), { name, color, createdAt: Date.now() });
+          setName('');
+        }}><Plus className="mr-2 h-4 w-4" /> Crear</Button>
       </CardContent></Card>
       <div className="grid grid-cols-2 gap-4">{categories.map(c => (
         <Card key={c.id} className="border-l-8" style={{ borderLeftColor: c.color }}>
@@ -557,7 +583,7 @@ function ModificadoresManager({ modifiers, orgId, locId }: { modifiers: Modifier
   const [options, setOptions] = useState<{name: string, price: number}[]>([{name: '', price: 0}]);
   const save = async () => {
     if (!name || options[0].name === '') return;
-    await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'modifiers'), { name, options: options.filter(o => o.name !== '') });
+    await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'modifiers'), { name, options: options.filter(o => o.name !== ''), createdAt: Date.now() });
     setName(''); setOptions([{name: '', price: 0}]);
   };
   return (
@@ -601,7 +627,11 @@ function DescuentosManager({ discounts, orgId, locId }: { discounts: Discount[],
             <SelectContent><SelectItem value="porcentaje">%</SelectItem><SelectItem value="monto">$ Cash</SelectItem></SelectContent>
           </Select>
         </div>
-        <Button className="w-full" onClick={() => addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), { name, value, type })}>Crear</Button>
+        <Button className="w-full" onClick={() => {
+          if (!name) return;
+          addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), { name, value, type, createdAt: Date.now() });
+          setName(''); setValue(0);
+        }}>Crear</Button>
       </CardContent></Card>
       <div className="space-y-4">{discounts.map(d => (
         <Card key={d.id} className="bg-accent/5"><CardContent className="p-4 flex justify-between items-center">
@@ -623,7 +653,6 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
   useEffect(() => {
     if (location) {
       setLocForm({
-        ...location,
         name: location.name || '',
         address: location.address || '',
         phoneNumber: location.phoneNumber || '',
@@ -636,15 +665,21 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
   const saveLocationDetails = async () => {
     setLoading(true);
     try {
-      const { id, ...dataToSave } = locForm;
-      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), {
-        ...dataToSave,
-        taxRate: Number(dataToSave.taxRate || 0),
+      // Saneamos los datos: solo incluimos lo que queremos actualizar
+      const dataToSave = {
+        name: locForm.name || '',
+        address: locForm.address || '',
+        phoneNumber: locForm.phoneNumber || '',
+        taxRate: Number(locForm.taxRate || 0),
+        logo: locForm.logo || '',
         updatedAt: Date.now()
-      });
+      };
+      
+      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), dataToSave);
       toast({ title: "Sucursal Actualizada" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Error al guardar" });
+    } catch (e: any) {
+      console.error("Save Error:", e);
+      toast({ variant: 'destructive', title: "Error al guardar", description: e.message });
     } finally {
       setLoading(false);
     }
@@ -726,7 +761,10 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
                </div>
              </div>
           </div>
-          <Button className="w-full font-bold" onClick={saveLocationDetails} disabled={loading}>GUARDAR CAMBIOS</Button>
+          <Button className="w-full font-bold" onClick={saveLocationDetails} disabled={loading}>
+            {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+            GUARDAR CAMBIOS
+          </Button>
         </CardContent>
       </Card>
 
@@ -755,10 +793,10 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
                 <div key={u.id} className="flex justify-between items-center p-3 border rounded-lg bg-white shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                      {u.name?.charAt(0)}
+                      {String(u.name || 'U').charAt(0)}
                     </div>
                     <div>
-                      <div className="font-bold text-sm">{u.name}</div>
+                      <div className="font-bold text-sm">{u.name || 'Sin nombre'}</div>
                       <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
                         <Badge variant="outline" className="text-[9px] py-0">{u.role}</Badge>
                         <span>{u.email}</span>
