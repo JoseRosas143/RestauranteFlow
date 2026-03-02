@@ -1,4 +1,3 @@
-
 import Link from 'next/link';
 import { ShoppingCart, Utensils, BarChart3, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +20,7 @@ export default function Home() {
     },
     {
       title: 'Panel de Administración',
-      description: 'Revisa métricas de ventas y crecimiento.',
+      description: 'Revisa métricas de ventas y configuración.',
       icon: <BarChart3 className="h-8 w-8 text-blue-600" />,
       href: '/admin',
       color: 'bg-blue-50',
@@ -31,9 +30,9 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-6 max-w-5xl mx-auto space-y-12">
       <div className="text-center space-y-4">
-        <h1 className="text-5xl font-bold tracking-tight text-primary">ChoripanFlow</h1>
+        <h1 className="text-5xl font-bold tracking-tight text-primary">RestauranteFlow</h1>
         <p className="text-xl text-muted-foreground max-w-2xl">
-          El flujo perfecto para tu cocina artesanal. Pedidos eficientes, seguimiento en tiempo real y análisis profundo.
+          El flujo perfecto para tu negocio gastronómico. Pedidos eficientes, multi-sucursal y análisis profundo.
         </p>
       </div>
 
@@ -60,7 +59,7 @@ export default function Home() {
       </div>
 
       <footer className="text-muted-foreground text-sm opacity-60">
-        &copy; {new Date().getFullYear()} ChoripanFlow. Diseñado para la excelencia en el servicio.
+        &copy; {new Date().getFullYear()} RestauranteFlow. Diseñado para la excelencia en el servicio.
       </footer>
     </div>
   );

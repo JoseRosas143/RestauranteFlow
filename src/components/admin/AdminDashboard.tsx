@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,33 +10,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useFirestore, useCollection, useDoc } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, setDoc } from 'firebase/firestore';
+import { useFirestore, useCollection, useDoc, useTenant } from '@/firebase';
+import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, setDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { 
   Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Edit2, 
   X, ImageIcon, ArrowLeft, Upload, Users, Mail, Phone, MapPin, 
-  Star, ShoppingBag, Calendar, Settings 
+  Star, ShoppingBag, Calendar, Settings, ShieldAlert, Store, RefreshCw, LogOut 
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { MenuItem, Category, Modifier, Discount, SoldBy, DiscountType, Customer, LoyaltySettings } from '@/lib/types';
+import { MenuItem, Category, Modifier, Discount, SoldBy, DiscountType, Customer, LoyaltySettings, UserProfile, Location, UserRole } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
 export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
   const db = useFirestore();
   const router = useRouter();
+  const { orgId, locId, setLoc } = useTenant();
 
-  const itemsQuery = useMemo(() => query(collection(db, 'menu'), orderBy('name', 'asc')), [db]);
-  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name', 'asc')), [db]);
-  const modifiersQuery = useMemo(() => collection(db, 'modifiers'), [db]);
-  const discountsQuery = useMemo(() => collection(db, 'discounts'), [db]);
-  const customersQuery = useMemo(() => query(collection(db, 'customers'), orderBy('name', 'asc')), [db]);
+  // Queries segmentadas por Multi-Tenant
+  const menuPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'menuItems') : null, [db, orgId, locId]);
+  const categoriesPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'categories') : null, [db, orgId, locId]);
+  const modifiersPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, [db, orgId, locId]);
+  const discountsPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'discounts') : null, [db, orgId, locId]);
+  const customersPath = useMemo(() => orgId ? collection(db, 'orgs', orgId, 'customers') : null, [db, orgId]);
+  const usersPath = useMemo(() => orgId ? collection(db, 'orgs', orgId, 'users') : null, [db, orgId]);
+  const locationDocRef = useMemo(() => orgId && locId ? doc(db, 'orgs', orgId, 'locations', locId) : null, [db, orgId, locId]);
 
-  const { data: items } = useCollection<MenuItem>(itemsQuery);
-  const { data: categories } = useCollection<Category>(categoriesQuery);
-  const { data: modifiers } = useCollection<Modifier>(modifiersQuery);
-  const { data: discounts } = useCollection<Discount>(discountsQuery);
-  const { data: customers } = useCollection<Customer>(customersQuery);
+  const { data: items } = useCollection<MenuItem>(menuPath ? query(menuPath, orderBy('name', 'asc')) : null);
+  const { data: categories } = useCollection<Category>(categoriesPath ? query(categoriesPath, orderBy('name', 'asc')) : null);
+  const { data: modifiers } = useCollection<Modifier>(modifiersPath);
+  const { data: discounts } = useCollection<Discount>(discountsPath);
+  const { data: customers } = useCollection<Customer>(customersPath ? query(customersPath, orderBy('name', 'asc')) : null);
+  const { data: staffUsers } = useCollection<UserProfile>(usersPath);
+  const { data: currentLocationData } = useDoc<Location>(locationDocRef);
 
   useEffect(() => {
     setMounted(true);
@@ -57,41 +62,57 @@ export default function AdminDashboard() {
           >
             <ArrowLeft className="h-6 w-6 text-primary" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-primary">Gestión de Catálogo</h1>
-            <p className="text-muted-foreground">Configura tus artículos, clientes y reglas de venta.</p>
+          <div className="flex items-center gap-3">
+             {currentLocationData?.logo && <img src={currentLocationData.logo} className="h-10 w-10 rounded-md object-cover" alt="Logo" />}
+             <div>
+                <h1 className="text-3xl font-bold text-primary">RestauranteFlow Admin</h1>
+                <p className="text-muted-foreground">{currentLocationData?.name || 'Sucursal'} • Gestión de Catálogo y Configuración</p>
+             </div>
           </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setLoc(null)} className="gap-2">
+          <Store className="h-4 w-4" /> Cambiar Sucursal
+        </Button>
       </header>
 
       <main className="flex-1 p-8">
         <Tabs defaultValue="articulos" className="space-y-6">
-          <TabsList className="bg-white border shadow-sm w-full max-w-4xl">
+          <TabsList className="bg-white border shadow-sm w-full max-w-6xl overflow-x-auto">
             <TabsTrigger value="articulos" className="flex-1 gap-2"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
             <TabsTrigger value="categorias" className="flex-1 gap-2"><Layers className="h-4 w-4" /> Categorías</TabsTrigger>
             <TabsTrigger value="modificadores" className="flex-1 gap-2"><Tag className="h-4 w-4" /> Modificadores</TabsTrigger>
             <TabsTrigger value="descuentos" className="flex-1 gap-2"><Percent className="h-4 w-4" /> Descuentos</TabsTrigger>
             <TabsTrigger value="clientes" className="flex-1 gap-2"><Users className="h-4 w-4" /> Clientes</TabsTrigger>
+            <TabsTrigger value="config" className="flex-1 gap-2"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           </TabsList>
 
           <TabsContent value="articulos">
-            <ArticulosManager items={items} categories={categories} />
+            <ArticulosManager items={items} categories={categories} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="categorias">
-            <CategoriasManager categories={categories} />
+            <CategoriasManager categories={categories} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="modificadores">
-            <ModificadoresManager modifiers={modifiers} />
+            <ModificadoresManager modifiers={modifiers} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="descuentos">
-            <DescuentosManager discounts={discounts} />
+            <DescuentosManager discounts={discounts} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="clientes">
-            <ClientesManager customers={customers} />
+            <ClientesManager customers={customers} orgId={orgId!} />
+          </TabsContent>
+
+          <TabsContent value="config">
+            <ConfigManager 
+              location={currentLocationData} 
+              staff={staffUsers} 
+              orgId={orgId!} 
+              locId={locId!} 
+            />
           </TabsContent>
         </Tabs>
       </main>
@@ -99,7 +120,7 @@ export default function AdminDashboard() {
   );
 }
 
-function ArticulosManager({ items, categories }: { items: MenuItem[], categories: Category[] }) {
+function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem[], categories: Category[], orgId: string, locId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -152,16 +173,17 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
         updatedAt: Date.now()
       };
 
+      const path = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
       if (editingId) {
-        await updateDoc(doc(db, 'menu', editingId), itemData);
+        await updateDoc(doc(path, editingId), itemData);
         toast({ title: "Artículo Actualizado" });
       } else {
-        await addDoc(collection(db, 'menu'), { ...itemData, createdAt: Date.now() });
+        await addDoc(path, { ...itemData, createdAt: Date.now() });
         toast({ title: "Artículo Guardado" });
       }
       resetForm();
     } catch (e) {
-      toast({ variant: 'destructive', title: "Error al guardar en base de datos" });
+      toast({ variant: 'destructive', title: "Error al guardar" });
     } finally {
       setLoading(false);
     }
@@ -271,7 +293,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button variant="ghost" size="icon" onClick={() => startEdit(item)}><Edit2 className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'menu', item.id!))}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'menuItems', item.id!))}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
             ))}
@@ -282,7 +304,7 @@ function ArticulosManager({ items, categories }: { items: MenuItem[], categories
   );
 }
 
-function ClientesManager({ customers }: { customers: Customer[] }) {
+function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -290,7 +312,7 @@ function ClientesManager({ customers }: { customers: Customer[] }) {
   const [loading, setLoading] = useState(false);
 
   // Configuración de Lealtad
-  const loyaltyDocRef = useMemo(() => doc(db, 'settings', 'loyalty'), [db]);
+  const loyaltyDocRef = useMemo(() => doc(db, 'orgs', orgId, 'settings', 'loyalty'), [db, orgId]);
   const { data: loyaltySettings } = useDoc<LoyaltySettings>(loyaltyDocRef);
   const [newPercentage, setNewPercentage] = useState<string>('');
 
@@ -329,11 +351,12 @@ function ClientesManager({ customers }: { customers: Customer[] }) {
     }
     setLoading(true);
     try {
+      const path = collection(db, 'orgs', orgId, 'customers');
       if (selectedCustomer && isEditing) {
-        await updateDoc(doc(db, 'customers', selectedCustomer.id!), customerForm);
+        await updateDoc(doc(path, selectedCustomer.id!), customerForm);
         toast({ title: "Cliente Actualizado" });
       } else {
-        await addDoc(collection(db, 'customers'), { ...customerForm, createdAt: Date.now() });
+        await addDoc(path, { ...customerForm, createdAt: Date.now() });
         toast({ title: "Cliente Registrado" });
       }
       setIsEditing(false);
@@ -348,7 +371,6 @@ function ClientesManager({ customers }: { customers: Customer[] }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Lista de Clientes */}
       <Card className="lg:col-span-1">
         <CardHeader className="flex flex-row justify-between items-center">
           <div>
@@ -392,8 +414,7 @@ function ClientesManager({ customers }: { customers: Customer[] }) {
                   <div className="font-bold">{c.name}</div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> {c.phone}</div>
                   <div className="flex justify-between items-center mt-2">
-                    <Badge variant="secondary">{c.points} pts</Badge>
-                    <span className="text-[10px] opacity-50">Visitas: {c.totalVisits}</span>
+                    <Badge variant="secondary">{c.points.toFixed(2)} pts</Badge>
                   </div>
                 </div>
               ))}
@@ -402,11 +423,9 @@ function ClientesManager({ customers }: { customers: Customer[] }) {
         </CardContent>
       </Card>
 
-      {/* Perfil o Formulario */}
       <Card className="lg:col-span-2 overflow-hidden bg-zinc-900 text-white">
         {selectedCustomer && !isEditing ? (
           <div className="h-full flex flex-col">
-            {/* Header del Perfil - Basado en la captura */}
             <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20">
               <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" className="text-white" onClick={() => setSelectedCustomer(null)}>
@@ -414,7 +433,6 @@ function ClientesManager({ customers }: { customers: Customer[] }) {
                 </Button>
                 <h2 className="text-xl font-bold">Perfil del cliente</h2>
               </div>
-              <Button variant="ghost" className="text-emerald-500 font-bold">AÑADIR AL TICKET</Button>
             </div>
 
             <div className="flex-1 p-8 space-y-8">
@@ -426,155 +444,48 @@ function ClientesManager({ customers }: { customers: Customer[] }) {
               </div>
 
               <div className="space-y-6 max-w-md mx-auto">
-                <div className="flex items-center gap-4">
-                  <Mail className="h-5 w-5 opacity-60" />
-                  <span className="text-sm">{selectedCustomer.email || 'Sin correo'}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Phone className="h-5 w-5 opacity-60" />
-                  <span className="text-sm">{selectedCustomer.phone}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <MapPin className="h-5 w-5 opacity-60" />
-                  <span className="text-sm">{selectedCustomer.city || 'Ciudad no especificada'}</span>
-                </div>
+                <div className="flex items-center gap-4"><Mail className="h-5 w-5 opacity-60" /><span>{selectedCustomer.email || 'Sin correo'}</span></div>
+                <div className="flex items-center gap-4"><Phone className="h-5 w-5 opacity-60" /><span>{selectedCustomer.phone}</span></div>
+                <div className="flex items-center gap-4"><MapPin className="h-5 w-5 opacity-60" /><span>{selectedCustomer.city || 'Ciudad no especificada'}</span></div>
 
-                <div className="grid grid-cols-1 gap-6 pt-6 border-t border-white/10">
-                  <div className="flex items-center gap-4">
+                <div className="grid grid-cols-3 gap-6 pt-6 border-t border-white/10">
+                  <div className="flex flex-col items-center gap-1">
                     <Star className="h-5 w-5 text-yellow-500" />
-                    <div>
-                      <div className="font-bold text-lg">{selectedCustomer.points.toFixed(2)}</div>
-                      <div className="text-xs opacity-50">Puntos</div>
-                    </div>
+                    <div className="font-bold">{selectedCustomer.points.toFixed(2)}</div>
+                    <div className="text-[10px] opacity-50">Puntos</div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-center gap-1">
                     <ShoppingBag className="h-5 w-5 text-emerald-500" />
-                    <div>
-                      <div className="font-bold text-lg">{selectedCustomer.totalVisits}</div>
-                      <div className="text-xs opacity-50">Visitas</div>
-                    </div>
+                    <div className="font-bold">{selectedCustomer.totalVisits}</div>
+                    <div className="text-[10px] opacity-50">Visitas</div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-center gap-1">
                     <Calendar className="h-5 w-5 text-blue-500" />
-                    <div>
-                      <div className="font-bold text-lg">
-                        {selectedCustomer.lastVisit ? new Date(selectedCustomer.lastVisit).toLocaleDateString() : 'Nunca'}
-                      </div>
-                      <div className="text-xs opacity-50">Última visita</div>
-                    </div>
+                    <div className="font-bold">{selectedCustomer.lastVisit ? new Date(selectedCustomer.lastVisit).toLocaleDateString() : 'Nunca'}</div>
+                    <div className="text-[10px] opacity-50">Última visita</div>
                   </div>
                 </div>
               </div>
 
               <div className="pt-8 space-y-4 max-w-md mx-auto">
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-emerald-500 font-bold h-12 hover:bg-white/5"
-                  onClick={() => setIsEditing(true)}
-                >
-                  EDITAR PERFIL
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-emerald-500 font-bold h-12 hover:bg-white/5"
-                  onClick={() => toast({ title: "Canje de puntos", description: "Próximamente disponible" })}
-                >
-                  CANJEAR PUNTOS
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-emerald-500 font-bold h-12 hover:bg-white/5"
-                  onClick={() => toast({ title: "Historial", description: "Cargando historial de compras..." })}
-                >
-                  VER COMPRAS
-                </Button>
+                <Button variant="ghost" className="w-full justify-start text-emerald-500 font-bold h-12 hover:bg-white/5" onClick={() => setIsEditing(true)}>EDITAR PERFIL</Button>
               </div>
             </div>
           </div>
         ) : (
           <div className="p-8 space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">{isEditing ? 'Editar Cliente' : 'Nuevo Registro'}</h2>
-              {(isEditing || customerForm.name) && (
-                <Button variant="ghost" onClick={() => { setIsEditing(false); setCustomerForm(initialCustomer); setSelectedCustomer(null); }}>
-                  <X />
-                </Button>
-              )}
-            </div>
-            
+            <h2 className="text-2xl font-bold">{isEditing ? 'Editar Cliente' : 'Nuevo Registro'}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label className="text-zinc-400">Nombre Completo *</Label>
-                <Input 
-                  className="bg-zinc-800 border-zinc-700 text-white" 
-                  value={customerForm.name} 
-                  onChange={e => setCustomerForm({...customerForm, name: e.target.value})} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-zinc-400">WhatsApp *</Label>
-                <Input 
-                  className="bg-zinc-800 border-zinc-700 text-white" 
-                  value={customerForm.phone} 
-                  onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-zinc-400">Email</Label>
-                <Input 
-                  className="bg-zinc-800 border-zinc-700 text-white" 
-                  value={customerForm.email} 
-                  onChange={e => setCustomerForm({...customerForm, email: e.target.value})} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-zinc-400">Fecha de Nacimiento</Label>
-                <Input 
-                  type="date" 
-                  className="bg-zinc-800 border-zinc-700 text-white" 
-                  value={customerForm.birthday} 
-                  onChange={e => setCustomerForm({...customerForm, birthday: e.target.value})} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-zinc-400">Ciudad</Label>
-                <Input 
-                  className="bg-zinc-800 border-zinc-700 text-white" 
-                  value={customerForm.city} 
-                  onChange={e => setCustomerForm({...customerForm, city: e.target.value})} 
-                />
-              </div>
+              <div className="space-y-2"><Label className="text-zinc-400">Nombre Completo *</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} /></div>
+              <div className="space-y-2"><Label className="text-zinc-400">WhatsApp *</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} /></div>
+              <div className="space-y-2"><Label className="text-zinc-400">Email</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} /></div>
+              <div className="space-y-2"><Label className="text-zinc-400">Fecha Nacimiento</Label><Input type="date" className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.birthday} onChange={e => setCustomerForm({...customerForm, birthday: e.target.value})} /></div>
             </div>
-
             <div className="space-y-4 pt-4">
-              <div className="flex items-center space-x-2">
-                <Switch 
-                  checked={customerForm.acceptsMarketing} 
-                  onCheckedChange={v => setCustomerForm({...customerForm, acceptsMarketing: v})} 
-                />
-                <Label className="text-sm text-zinc-300 cursor-pointer" onClick={() => setCustomerForm({...customerForm, acceptsMarketing: !customerForm.acceptsMarketing})}>
-                  Acepto recibir publicidad o comentarios
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch 
-                  checked={customerForm.acceptsTerms} 
-                  onCheckedChange={v => setCustomerForm({...customerForm, acceptsTerms: v})} 
-                />
-                <Label className="text-sm text-zinc-300 cursor-pointer" onClick={() => setCustomerForm({...customerForm, acceptsTerms: !customerForm.acceptsTerms})}>
-                  Acepto los términos y condiciones del sitio web *
-                </Label>
-              </div>
+               <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsMarketing} onCheckedChange={v => setCustomerForm({...customerForm, acceptsMarketing: v})} /><Label className="text-sm text-zinc-300">Acepto recibir publicidad</Label></div>
+               <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsTerms} onCheckedChange={v => setCustomerForm({...customerForm, acceptsTerms: v})} /><Label className="text-sm text-zinc-300">Acepto términos y condiciones *</Label></div>
             </div>
-
-            <Button 
-              className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg"
-              onClick={handleSaveCustomer}
-              disabled={loading}
-            >
-              {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />}
-              {isEditing ? 'ACTUALIZAR DATOS' : 'REGISTRAR CLIENTE'}
-            </Button>
+            <Button className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black" onClick={handleSaveCustomer} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />}{isEditing ? 'ACTUALIZAR DATOS' : 'REGISTRAR CLIENTE'}</Button>
           </div>
         )}
       </Card>
@@ -582,7 +493,7 @@ function ClientesManager({ customers }: { customers: Customer[] }) {
   );
 }
 
-function CategoriasManager({ categories }: { categories: Category[] }) {
+function CategoriasManager({ categories, orgId, locId }: { categories: Category[], orgId: string, locId: string }) {
   const db = useFirestore();
   const [name, setName] = useState('');
   const [color, setColor] = useState('#B8732E');
@@ -592,25 +503,25 @@ function CategoriasManager({ categories }: { categories: Category[] }) {
       <CardContent className="space-y-4">
         <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre" />
         <Input type="color" value={color} onChange={e => setColor(e.target.value)} className="h-12" />
-        <Button className="w-full" onClick={() => addDoc(collection(db, 'categories'), { name, color })}><Plus className="mr-2 h-4 w-4" /> Crear</Button>
+        <Button className="w-full" onClick={() => addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), { name, color })}><Plus className="mr-2 h-4 w-4" /> Crear</Button>
       </CardContent></Card>
       <div className="grid grid-cols-2 gap-4">{categories.map(c => (
         <Card key={c.id} className="border-l-8" style={{ borderLeftColor: c.color }}>
           <CardContent className="p-4 flex justify-between items-center"><span className="font-bold">{c.name}</span>
-          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'categories', c.id!))}><Trash2 className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'categories', c.id!))}><Trash2 className="h-4 w-4" /></Button>
         </CardContent></Card>
       ))}</div>
     </div>
   );
 }
 
-function ModificadoresManager({ modifiers }: { modifiers: Modifier[] }) {
+function ModificadoresManager({ modifiers, orgId, locId }: { modifiers: Modifier[], orgId: string, locId: string }) {
   const db = useFirestore();
   const [name, setName] = useState('');
   const [options, setOptions] = useState<{name: string, price: number}[]>([{name: '', price: 0}]);
   const save = async () => {
     if (!name || options[0].name === '') return;
-    await addDoc(collection(db, 'modifiers'), { name, options: options.filter(o => o.name !== '') });
+    await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'modifiers'), { name, options: options.filter(o => o.name !== '') });
     setName(''); setOptions([{name: '', price: 0}]);
   };
   return (
@@ -637,7 +548,7 @@ function ModificadoresManager({ modifiers }: { modifiers: Modifier[] }) {
   );
 }
 
-function DescuentosManager({ discounts }: { discounts: Discount[] }) {
+function DescuentosManager({ discounts, orgId, locId }: { discounts: Discount[], orgId: string, locId: string }) {
   const db = useFirestore();
   const [name, setName] = useState('');
   const [value, setValue] = useState(0);
@@ -654,14 +565,154 @@ function DescuentosManager({ discounts }: { discounts: Discount[] }) {
             <SelectContent><SelectItem value="porcentaje">%</SelectItem><SelectItem value="monto">$ Cash</SelectItem></SelectContent>
           </Select>
         </div>
-        <Button className="w-full" onClick={() => addDoc(collection(db, 'discounts'), { name, value, type })}>Crear</Button>
+        <Button className="w-full" onClick={() => addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), { name, value, type })}>Crear</Button>
       </CardContent></Card>
       <div className="space-y-4">{discounts.map(d => (
         <Card key={d.id} className="bg-accent/5"><CardContent className="p-4 flex justify-between items-center">
           <div><div className="font-black">{d.name}</div><div className="text-xs">{d.type === 'porcentaje' ? `${d.value}%` : `$${d.value}`}</div></div>
-          <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'discounts', d.id!))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'discounts', d.id!))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
         </CardContent></Card>
       ))}</div>
+    </div>
+  );
+}
+
+function ConfigManager({ location, staff, orgId, locId }: { location?: Location, staff: UserProfile[], orgId: string, locId: string }) {
+  const db = useFirestore();
+  const { toast } = useToast();
+  const [locForm, setLocForm] = useState<Partial<Location>>(location || {});
+  const [loading, setLoading] = useState(false);
+  const [newUser, setNewUser] = useState<Partial<UserProfile>>({ role: 'cashier', allowedLocIds: [locId] });
+
+  useEffect(() => {
+    if (location) setLocForm(location);
+  }, [location]);
+
+  const saveLocationDetails = async () => {
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), locForm);
+      toast({ title: "Sucursal Actualizada" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Error al guardar" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetAnalytics = async () => {
+    if (!confirm("¿Seguro que deseas resetear todas las analíticas diarias de esta sucursal?")) return;
+    setLoading(true);
+    try {
+      const path = collection(db, 'orgs', orgId, 'locations', locId, 'analytics', 'daily', 'days');
+      const snap = await getDocs(path);
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      toast({ title: "Analíticas Reseteadas" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Error al resetear" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setLocForm({ ...locForm, logo: reader.result as string });
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addUser = async () => {
+    if (!newUser.name) return;
+    try {
+      await addDoc(collection(db, 'orgs', orgId, 'users'), { 
+        ...newUser, 
+        orgId, 
+        allowedLocIds: [locId] 
+      });
+      toast({ title: "Usuario Creado" });
+      setNewUser({ role: 'cashier', allowedLocIds: [locId] });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Error" });
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Datos de la Sucursal */}
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Store className="h-5 w-5" /> Datos de la Sucursal</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-xl bg-muted border-2 border-dashed flex items-center justify-center overflow-hidden relative">
+              {locForm.logo ? (
+                <img src={locForm.logo} className="w-full h-full object-cover" alt="Logo" />
+              ) : (
+                <ImageIcon className="opacity-20" />
+              )}
+            </div>
+            <Button variant="outline" onClick={() => document.getElementById('logo-up')?.click()}><Upload className="mr-2 h-4 w-4" /> Cambiar Logo</Button>
+            <input id="logo-up" type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+          </div>
+          <div className="space-y-2"><Label>Nombre del Establecimiento</Label><Input value={locForm.name} onChange={e => setLocForm({...locForm, name: e.target.value})} /></div>
+          <div className="space-y-2"><Label>Ubicación / Dirección</Label><Input value={locForm.address} onChange={e => setLocForm({...locForm, address: e.target.value})} /></div>
+          <Button className="w-full" onClick={saveLocationDetails} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Sucursal</Button>
+        </CardContent>
+      </Card>
+
+      {/* Gestión de Roles de Usuario */}
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5" /> Usuarios y Roles</CardTitle></CardHeader>
+        <CardContent className="space-y-6">
+          <div className="p-4 border rounded-xl bg-muted/20 space-y-4">
+            <Label className="font-bold">Añadir Staff</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Nombre" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
+              <Select value={newUser.role} onValueChange={(v: UserRole) => setNewUser({...newUser, role: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="manager">Gerente</SelectItem>
+                  <SelectItem value="cashier">Cajero</SelectItem>
+                  <SelectItem value="kitchen">Cocina</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" className="w-full" onClick={addUser}>Añadir al Equipo</Button>
+          </div>
+          <ScrollArea className="h-[200px]">
+            <div className="space-y-2">
+              {staff.map(u => (
+                <div key={u.uid} className="flex justify-between items-center p-3 border rounded-lg">
+                  <div>
+                    <div className="font-bold text-sm">{u.name || 'Sin nombre'}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{u.role}</div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.uid))}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      {/* Mantenimiento */}
+      <Card className="border-destructive/20 bg-destructive/5">
+        <CardHeader><CardTitle className="flex items-center gap-2 text-destructive"><ShieldAlert className="h-5 w-5" /> Zona de Peligro</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="font-bold">Resetear Analíticas</div>
+              <div className="text-xs text-muted-foreground">Elimina permanentemente los datos de ventas diarias.</div>
+            </div>
+            <Button variant="destructive" onClick={resetAnalytics} disabled={loading}><RefreshCw className="mr-2 h-4 w-4" /> Resetear</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

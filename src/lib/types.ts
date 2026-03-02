@@ -1,4 +1,3 @@
-
 export type UserRole = 'admin' | 'manager' | 'cashier' | 'kitchen';
 export type OrderStatus = 'draft' | 'open' | 'confirmed' | 'paid';
 export type TicketStatus = 'new' | 'preparing' | 'ready' | 'served';
@@ -12,6 +11,8 @@ export interface UserProfile {
   role: UserRole;
   orgId: string;
   allowedLocIds: string[];
+  name?: string;
+  email?: string;
 }
 
 export interface Organization {
@@ -23,6 +24,7 @@ export interface Location {
   id: string;
   name: string;
   address?: string;
+  logo?: string;
 }
 
 export interface ModifierOption {

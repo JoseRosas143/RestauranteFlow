@@ -1,11 +1,10 @@
-
 import type {Metadata} from 'next';
 import './globals.css';
 import {Toaster} from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'ChoripanFlow | POS y Cocina',
+  title: 'RestauranteFlow | POS y Cocina',
   description: 'Gestión de POS y cocina sin esfuerzo para sabores artesanales',
 };
 
