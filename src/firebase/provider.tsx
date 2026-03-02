@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
@@ -20,6 +19,7 @@ interface UserAuthState {
   userError: Error | null;
   orgId: string | null;
   allowedLocs: string[];
+  role: string | null;
 }
 
 export interface FirebaseContextState extends UserAuthState {
@@ -44,13 +44,13 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     isUserLoading: true,
     userError: null,
     orgId: null,
-    allowedLocs: []
+    allowedLocs: [],
+    role: null
   });
 
   const [locId, setLocId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Restaurar locId de localStorage
     const savedLoc = localStorage.getItem('restauranteFlow_locId');
     if (savedLoc) setLocId(savedLoc);
   }, []);
@@ -71,7 +71,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Intentar obtener el orgId del documento del usuario
           const userDoc = await getDoc(doc(firestore, 'users', firebaseUser.uid));
           const userData = userDoc.data();
           
@@ -79,14 +78,15 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             user: firebaseUser,
             isUserLoading: false,
             userError: null,
-            orgId: userData?.orgId || firebaseUser.uid,
-            allowedLocs: userData?.allowedLocIds || []
+            orgId: userData?.orgId || null,
+            allowedLocs: userData?.allowedLocIds || [],
+            role: userData?.role || 'user'
           });
         } catch (e) {
           setUserState(prev => ({ ...prev, user: firebaseUser, isUserLoading: false }));
         }
       } else {
-        setUserState({ user: null, isUserLoading: false, userError: null, orgId: null, allowedLocs: [] });
+        setUserState({ user: null, isUserLoading: false, userError: null, orgId: null, allowedLocs: [], role: null });
         setLoc(null);
       }
     });
@@ -120,8 +120,8 @@ export const useFirebase = () => {
 export const useAuth = () => useFirebase().auth!;
 export const useFirestore = () => useFirebase().firestore!;
 export const useUser = () => {
-  const { user, isUserLoading, userError, orgId } = useFirebase();
-  return { user, isUserLoading, userError, orgId };
+  const { user, isUserLoading, userError, orgId, role } = useFirebase();
+  return { user, isUserLoading, userError, orgId, role };
 };
 
 export const useTenant = () => {

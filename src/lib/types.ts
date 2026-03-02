@@ -15,11 +15,13 @@ export interface UserProfile {
   name?: string;
   email?: string;
   phone?: string;
+  pin?: string; // PIN de 4 dígitos para acceso rápido y asistencia
 }
 
 export interface Organization {
   id: string;
   name: string;
+  storeId: string; // El ID de 6 dígitos
 }
 
 export interface Location {
@@ -32,47 +34,13 @@ export interface Location {
   createdAt: number;
 }
 
-export interface ModifierOption {
-  name: string;
-  price: number;
-}
-
-export interface Modifier {
+export interface AttendanceRecord {
   id?: string;
-  name: string;
-  options: ModifierOption[];
-}
-
-export interface Category {
-  id?: string;
-  name: string;
-  color: string;
-}
-
-export interface Discount {
-  id?: string;
-  name: string;
-  value: number;
-  type: DiscountType;
-}
-
-export interface Customer {
-  id?: string;
-  name: string;
-  phone: string;
-  email?: string;
-  birthday?: string;
-  city?: string;
-  acceptsMarketing: boolean;
-  acceptsTerms: boolean;
-  points: number;
-  totalVisits: number;
-  lastVisit: number;
-  createdAt: number;
-}
-
-export interface LoyaltySettings {
-  pointsPercentage: number;
+  userId: string;
+  userName: string;
+  timestamp: number;
+  type: 'in' | 'out';
+  locId: string;
 }
 
 export interface MenuItem {
@@ -99,7 +67,7 @@ export interface OrderItem {
   name: string;
   quantity: number;
   priceAtOrder: number;
-  selectedModifiers: ModifierOption[];
+  selectedModifiers: {name: string, price: number}[];
   notes?: string;
 }
 
@@ -128,6 +96,7 @@ export interface Order {
   createdAt: number;
   locId: string;
   orgId: string;
+  staffId?: string; // Quién tomó el pedido
 }
 
 export interface KitchenTicket {
@@ -142,9 +111,6 @@ export interface KitchenTicket {
   locId: string;
 }
 
-export interface DailyAnalytics {
-  id: string; // YYYYMMDD
-  totalRevenue: number;
-  totalOrders: number;
-  items: Record<string, { quantity: number; revenue: number }>;
+export interface LoyaltySettings {
+  pointsPercentage: number;
 }
