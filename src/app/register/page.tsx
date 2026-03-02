@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Rocket, Loader2, Store } from 'lucide-react';
+import { Rocket, Loader2, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,6 +24,10 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const generateStoreId = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
@@ -34,17 +38,9 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
+      const newStoreId = generateStoreId();
       
-      await setDoc(doc(db, 'orgs', user.uid, 'users', user.uid), {
-        uid: user.uid,
-        name: name,
-        email: email,
-        role: 'admin',
-        orgId: user.uid,
-        allowedLocIds: [],
-        createdAt: Date.now()
-      });
-
+      // Crear perfil global
       await setDoc(doc(db, 'users', user.uid), {
         id: user.uid,
         firstName: name.split(' ')[0],
@@ -52,12 +48,34 @@ export default function RegisterPage() {
         email: email,
         role: 'Admin',
         branchId: '',
-        orgId: user.uid,
+        orgId: newStoreId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
 
-      toast({ title: "¡Registro exitoso!", description: "Redirigiendo para configurar su primer restaurante." });
+      // Inicializar organización
+      await setDoc(doc(db, 'orgs', newStoreId), {
+        id: newStoreId,
+        name: `${name}'s Restaurant`,
+        ownerUid: user.uid,
+        createdAt: Date.now()
+      });
+
+      // Crear usuario dentro de la organización
+      await setDoc(doc(db, 'orgs', newStoreId, 'users', user.uid), {
+        uid: user.uid,
+        name: name,
+        email: email,
+        role: 'admin',
+        orgId: newStoreId,
+        allowedLocIds: [],
+        createdAt: Date.now()
+      });
+
+      toast({ 
+        title: "¡Bienvenido a RestauranteFlow!", 
+        description: `Tu ID de Tienda es: ${newStoreId}. Guárdalo bien.` 
+      });
       router.push('/admin');
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error al registrar", description: error.message });
@@ -75,19 +93,10 @@ export default function RegisterPage() {
       
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists()) {
+        const newStoreId = generateStoreId();
         const firstName = user.displayName?.split(' ')[0] || '';
         const lastName = user.displayName?.split(' ').slice(1).join(' ') || '';
         
-        await setDoc(doc(db, 'orgs', user.uid, 'users', user.uid), {
-          uid: user.uid,
-          name: user.displayName,
-          email: user.email,
-          role: 'admin',
-          orgId: user.uid,
-          allowedLocIds: [],
-          createdAt: Date.now()
-        });
-
         await setDoc(doc(db, 'users', user.uid), {
           id: user.uid,
           firstName,
@@ -95,15 +104,31 @@ export default function RegisterPage() {
           email: user.email,
           role: 'Admin',
           branchId: '',
-          orgId: user.uid,
+          orgId: newStoreId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
+
+        await setDoc(doc(db, 'orgs', newStoreId), {
+          id: newStoreId,
+          name: `${user.displayName}'s Restaurant`,
+          ownerUid: user.uid,
+          createdAt: Date.now()
+        });
         
-        toast({ title: "¡Bienvenido!", description: "Vamos a configurar su restaurante." });
+        await setDoc(doc(db, 'orgs', newStoreId, 'users', user.uid), {
+          uid: user.uid,
+          name: user.displayName,
+          email: user.email,
+          role: 'admin',
+          orgId: newStoreId,
+          allowedLocIds: [],
+          createdAt: Date.now()
+        });
+        
+        toast({ title: "¡Bienvenido!", description: `Tu ID de Tienda generado es ${newStoreId}` });
         router.push('/admin');
       } else {
-        toast({ title: "Cuenta ya registrada", description: "Iniciando sesión..." });
         router.push('/');
       }
     } catch (error: any) {
@@ -115,56 +140,58 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent/10 via-background to-background">
-      <Card className="w-full max-w-md shadow-2xl border-t-4 border-t-accent">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mb-4">
-            <Rocket className="h-6 w-6 text-accent" />
+      <Card className="w-full max-w-md shadow-2xl border-t-4 border-t-accent rounded-[2rem] overflow-hidden">
+        <CardHeader className="text-center pt-8">
+          <div className="mx-auto w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+            <Rocket className="h-8 w-8 text-accent" />
           </div>
-          <CardTitle className="text-2xl font-bold text-accent">Crea tu Cuenta</CardTitle>
-          <CardDescription>Comienza hoy mismo con RestauranteFlow</CardDescription>
+          <CardTitle className="text-3xl font-black text-accent uppercase italic tracking-tighter">Únete al Flujo</CardTitle>
+          <CardDescription className="font-bold uppercase text-[10px] tracking-widest mt-2">Crea tu cuenta profesional hoy</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6 px-8">
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre Completo</Label>
-              <Input id="name" placeholder="Juan Pérez" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Label htmlFor="name" className="text-[10px] font-black uppercase ml-1">Nombre Completo</Label>
+              <Input id="name" placeholder="Ej: Mario Rossi" value={name} onChange={(e) => setName(e.target.value)} required className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-accent" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Correo Electrónico</Label>
-              <Input id="email" type="email" placeholder="juan@negocio.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="email" className="text-[10px] font-black uppercase ml-1">Email Corporativo</Label>
+              <Input id="email" type="email" placeholder="mario@negocio.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-accent" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña (min. 6 caracteres)</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Label htmlFor="password" dir="ltr" className="text-[10px] font-black uppercase ml-1">Contraseña Segura</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-accent" />
             </div>
-            <Button type="submit" className="w-full h-11 font-bold bg-accent hover:bg-accent/90" disabled={loading}>
-              {loading ? <Loader2 className="animate-spin mr-2" /> : "Comenzar Onboarding"}
+            <Button type="submit" className="w-full h-14 font-black text-lg bg-accent hover:bg-accent/90 shadow-xl shadow-accent/20 rounded-xl mt-4" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin mr-2" /> : "COMENZAR ONBOARDING"}
             </Button>
           </form>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">O regístrate con</span></div>
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-muted" /></div>
+            <div className="relative flex justify-center text-[10px] uppercase font-black"><span className="bg-background px-4 text-muted-foreground">O vía Google</span></div>
           </div>
 
-          <Button variant="outline" type="button" className="w-full h-11 font-bold" onClick={handleGoogleRegister} disabled={loading}>
-            {loading ? <Loader2 className="animate-spin mr-2" /> : (
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-              </svg>
-            )}
-            Google
+          <Button variant="outline" type="button" className="w-full h-12 font-bold border-2 rounded-xl hover:bg-muted/50" onClick={handleGoogleRegister} disabled={loading}>
+            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+            </svg>
+            Acceso Rápido Google
           </Button>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
-          <div className="text-sm text-center text-muted-foreground">
+        <CardFooter className="bg-muted/30 p-6 flex flex-col gap-4 border-t">
+          <div className="text-sm text-center font-bold text-muted-foreground">
             ¿Ya tiene una cuenta?{" "}
-            <Link href="/login" className="text-accent font-bold hover:underline">
-              Inicie sesión
+            <Link href="/login" className="text-accent hover:underline">
+              Inicie sesión aquí
             </Link>
+          </div>
+          <div className="flex items-center justify-center gap-2 opacity-50">
+            <ShieldCheck className="h-3 w-3" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Servidores Cifrados SSL</span>
           </div>
         </CardFooter>
       </Card>

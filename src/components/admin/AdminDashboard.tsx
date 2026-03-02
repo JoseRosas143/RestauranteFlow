@@ -17,7 +17,7 @@ import { signOut } from 'firebase/auth';
 import { 
   Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Edit2, 
   X, ImageIcon, ArrowLeft, Upload, Users, Mail, Phone, MapPin, 
-  Star, ShoppingBag, Calendar, Settings, ShieldAlert, Store, RefreshCw, LogOut 
+  Star, ShoppingBag, Calendar, Settings, ShieldAlert, Store, RefreshCw, LogOut, Copy 
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, Category, Modifier, Discount, SoldBy, DiscountType, Customer, LoyaltySettings, UserProfile, Location, UserRole } from '@/lib/types';
@@ -703,6 +703,7 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
   const { toast } = useToast();
   const [locForm, setLocForm] = useState<Partial<Location>>(location || { name: '', address: '', phoneNumber: '', taxRate: 0, logo: '' });
   const [loading, setLoading] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [newUser, setNewUser] = useState<Partial<UserProfile>>({ name: '', email: '', role: 'cashier', allowedLocIds: [locId] });
 
   useEffect(() => {
@@ -783,24 +784,46 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
     }
   };
 
-  const addUser = async () => {
+  const saveStaffUser = async () => {
     if (!newUser.name || !newUser.email) {
       toast({ variant: 'destructive', title: "Nombre y Email son requeridos" });
       return;
     }
+    setLoading(true);
     try {
-      await addDoc(collection(db, 'orgs', orgId, 'users'), { 
-        ...newUser, 
-        uid: `USER-${Date.now()}`,
-        orgId, 
-        allowedLocIds: [locId],
-        createdAt: Date.now()
-      });
-      toast({ title: "Usuario Creado", description: "El empleado ahora puede acceder con su ID." });
+      const path = collection(db, 'orgs', orgId, 'users');
+      const cleanData = { 
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        allowedLocIds: newUser.allowedLocIds || [locId],
+        updatedAt: Date.now()
+      };
+
+      if (editingStaffId) {
+        await updateDoc(doc(path, editingStaffId), cleanData);
+        toast({ title: "Empleado Actualizado" });
+      } else {
+        await addDoc(path, { 
+          ...cleanData, 
+          uid: `USER-${Date.now()}`,
+          orgId, 
+          createdAt: Date.now()
+        });
+        toast({ title: "Empleado Creado", description: "Ahora puede acceder con su ID." });
+      }
       setNewUser({ name: '', email: '', role: 'cashier', allowedLocIds: [locId] });
+      setEditingStaffId(null);
     } catch (e) {
-      toast({ variant: 'destructive', title: "Error al añadir usuario" });
+      toast({ variant: 'destructive', title: "Error al guardar empleado" });
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const editStaff = (user: UserProfile) => {
+    setNewUser({ ...user });
+    setEditingStaffId(user.id!);
   };
 
   return (
@@ -812,6 +835,19 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
           <div className="flex flex-col items-center gap-4">
+             <div className="p-4 bg-primary/5 rounded-2xl border-2 border-primary/20 flex items-center justify-between w-full">
+               <div className="flex items-center gap-3">
+                 <ShieldAlert className="h-5 w-5 text-primary" />
+                 <div>
+                   <p className="text-[10px] font-black uppercase text-muted-foreground leading-none">ID de Tienda Corporativo</p>
+                   <p className="text-xl font-black text-primary tracking-tighter">{orgId}</p>
+                 </div>
+               </div>
+               <Button variant="ghost" size="icon" onClick={() => { navigator.clipboard.writeText(orgId); toast({title: "Copiado"}); }}>
+                 <Copy className="h-4 w-4 opacity-40 hover:opacity-100 transition-opacity" />
+               </Button>
+             </div>
+
             <div className="w-24 h-24 rounded-2xl bg-white border-2 border-dashed flex items-center justify-center overflow-hidden relative shadow-inner">
               {locForm.logo ? (
                 <img src={locForm.logo} className="w-full h-full object-cover" alt="Logo" />
@@ -844,10 +880,13 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
       </Card>
 
       <Card className="border-t-4 border-primary shadow-xl">
-        <CardHeader className="bg-muted/20"><CardTitle className="flex items-center gap-2 font-black uppercase tracking-tighter"><ShieldAlert className="h-6 w-6" /> Equipo y Permisos</CardTitle></CardHeader>
+        <CardHeader className="bg-muted/20 flex flex-row justify-between items-center">
+          <CardTitle className="flex items-center gap-2 font-black uppercase tracking-tighter"><ShieldAlert className="h-6 w-6" /> Equipo y Permisos</CardTitle>
+          {editingStaffId && <Button variant="ghost" size="sm" onClick={() => { setEditingStaffId(null); setNewUser({ name: '', email: '', role: 'cashier', allowedLocIds: [locId] }); }}><X className="h-4 w-4 mr-1" /> CANCELAR EDIT</Button>}
+        </CardHeader>
         <CardContent className="space-y-6 pt-6">
           <div className="p-6 border-2 rounded-3xl bg-primary/5 space-y-4">
-            <h4 className="font-black text-xs uppercase tracking-widest text-primary">Contratar nuevo staff</h4>
+            <h4 className="font-black text-xs uppercase tracking-widest text-primary">{editingStaffId ? 'Actualizar Staff' : 'Contratar nuevo staff'}</h4>
             <div className="space-y-3">
               <Input placeholder="Nombre Completo" value={newUser.name || ''} onChange={e => setNewUser({...newUser, name: e.target.value})} className="h-11 font-bold" />
               <Input type="email" placeholder="Correo Corporativo" value={newUser.email || ''} onChange={e => setNewUser({...newUser, email: e.target.value})} className="h-11 font-bold" />
@@ -864,7 +903,9 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
                 </Select>
               </div>
             </div>
-            <Button variant="outline" className="w-full h-12 font-black border-2 border-primary text-primary hover:bg-primary hover:text-white" onClick={addUser}>DAR DE ALTA EMPLEADO</Button>
+            <Button className="w-full h-12 font-black shadow-lg" onClick={saveStaffUser} disabled={loading}>
+              {loading ? <Loader2 className="animate-spin mr-2" /> : (editingStaffId ? 'ACTUALIZAR DATOS' : 'DAR DE ALTA EMPLEADO')}
+            </Button>
           </div>
           <div className="space-y-3">
             <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground px-2">Plantilla Actual</h4>
@@ -884,7 +925,10 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
                         </div>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="text-destructive rounded-full hover:bg-destructive/10" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.id!))}><Trash2 className="h-4 w-4" /></Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => editStaff(u)}><Edit2 className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive h-8 w-8 rounded-full hover:bg-destructive/10" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.id!))}><Trash2 className="h-3 w-3" /></Button>
+                    </div>
                   </div>
                 ))}
               </div>
