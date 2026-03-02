@@ -1,25 +1,24 @@
+
 "use client"
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase, useAuth } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, setDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { 
-  Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Edit2, 
-  X, ImageIcon, ArrowLeft, Upload, Users, Mail, Phone, MapPin, 
-  Star, ShoppingBag, Calendar, Settings, ShieldAlert, Store, RefreshCw, LogOut, Copy, KeyRound
+  Plus, Trash2, Package, Loader2, Edit2, 
+  X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, Mail
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { MenuItem, Category, Modifier, Discount, SoldBy, DiscountType, Customer, LoyaltySettings, UserProfile, Location, UserRole } from '@/lib/types';
+import { MenuItem, UserProfile, Location } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
 export default function AdminDashboard() {
@@ -35,26 +34,6 @@ export default function AdminDashboard() {
     [db, orgId, locId]
   );
   
-  const categoriesQuery = useMemoFirebase(() => 
-    orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), orderBy('name', 'asc')) : null, 
-    [db, orgId, locId]
-  );
-  
-  const modifiersQuery = useMemoFirebase(() => 
-    orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, 
-    [db, orgId, locId]
-  );
-  
-  const discountsQuery = useMemoFirebase(() => 
-    orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'discounts') : null, 
-    [db, orgId, locId]
-  );
-  
-  const customersQuery = useMemoFirebase(() => 
-    orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, 
-    [db, orgId]
-  );
-  
   const usersQuery = useMemoFirebase(() => 
     orgId ? collection(db, 'orgs', orgId, 'users') : null, 
     [db, orgId]
@@ -66,10 +45,6 @@ export default function AdminDashboard() {
   );
 
   const { data: items } = useCollection<MenuItem>(itemsQuery);
-  const { data: categories } = useCollection<Category>(categoriesQuery);
-  const { data: modifiers } = useCollection<Modifier>(modifiersQuery);
-  const { data: discounts } = useCollection<Discount>(discountsQuery);
-  const { data: customers } = useCollection<Customer>(customersQuery);
   const { data: staffUsers } = useCollection<UserProfile>(usersQuery);
   const { data: currentLocationData } = useDoc<Location>(locationDocRef);
 
@@ -105,31 +80,33 @@ export default function AdminDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="h-9 px-4 border-2 font-black text-primary gap-2">
-            <Store className="h-4 w-4" /> STORE ID: {orgId}
+            <Store className="h-4 w-4" /> STORE ID: {orgId || '000000'}
           </Badge>
           <Button variant="outline" size="sm" onClick={() => setLoc(null)} className="font-bold border-2">CAMBIAR SUCURSAL</Button>
-          <Button variant="destructive" size="sm" onClick={handleLogout} className="font-bold">SALIR</Button>
+          <Button variant="destructive" size="sm" onClick={handleLogout} className="font-bold gap-2">
+            <LogOut className="h-4 w-4" /> SALIR
+          </Button>
         </div>
       </header>
 
       <main className="flex-1 p-8">
         <Tabs defaultValue="articulos" className="space-y-6 max-w-7xl mx-auto">
           <TabsList className="bg-white border shadow-sm w-full h-14 p-1 gap-1">
-            <TabsTrigger value="articulos" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
-            <TabsTrigger value="clientes" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white"><Users className="h-4 w-4" /> Clientes</TabsTrigger>
-            <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
+            <TabsTrigger value="articulos" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
+            <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter"><Users className="h-4 w-4" /> Mi Equipo</TabsTrigger>
+            <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter"><Settings className="h-4 w-4" /> Ajustes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="articulos">
-            <ArticulosManager items={items || []} categories={categories || []} orgId={orgId!} locId={locId!} />
+            <ArticulosManager items={items || []} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
-          <TabsContent value="clientes">
-            <ClientesManager customers={customers || []} orgId={orgId!} />
+          <TabsContent value="personal">
+            <StaffManager staff={staffUsers || []} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="config">
-            <ConfigManager location={currentLocationData || undefined} staff={staffUsers || []} orgId={orgId!} locId={locId!} />
+            <ConfigManager location={currentLocationData || undefined} orgId={orgId!} locId={locId!} />
           </TabsContent>
         </Tabs>
       </main>
@@ -137,18 +114,20 @@ export default function AdminDashboard() {
   );
 }
 
-// ... (ArticulosManager y ClientesManager se mantienen similares)
-function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem[], categories: Category[], orgId: string, locId: string }) {
+function ArticulosManager({ items, orgId, locId }: { items: MenuItem[], orgId: string, locId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  const initialItemState: Partial<MenuItem> = { name: '', price: 0, cost: 0, category: '', soldBy: 'unidad', trackInventory: false, inventoryCount: 0, image: '' };
+  const initialItemState: Partial<MenuItem> = { name: '', price: 0, cost: 0, category: 'General' };
   const [newItem, setNewItem] = useState<Partial<MenuItem>>(initialItemState);
 
   const saveItem = async () => {
-    if (!newItem.name || newItem.price === undefined) return;
+    if (!newItem.name || newItem.price === undefined) {
+      toast({ variant: 'destructive', title: 'Faltan datos', description: 'Nombre y precio son obligatorios.' });
+      return;
+    }
     setLoading(true);
     try {
       const path = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
@@ -156,29 +135,40 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
       delete (data as any).id;
       if (editingId) await updateDoc(doc(path, editingId), data);
       else await addDoc(path, { ...data, createdAt: Date.now() });
-      setNewItem(initialItemState); setEditingId(null);
-      toast({ title: "Guardado" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error" }); }
+      setNewItem(initialItemState); 
+      setEditingId(null);
+      toast({ title: "Artículo Guardado" });
+    } catch (e) { toast({ variant: 'destructive', title: "Error al guardar artículo" }); }
     finally { setLoading(false); }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <Card className="lg:col-span-1 shadow-md border-t-4 border-primary">
-        <CardHeader><CardTitle className="text-xl font-black">{editingId ? 'Editar' : 'Nuevo'} Artículo</CardTitle></CardHeader>
+      <Card className="lg:col-span-1 shadow-md border-t-4 border-primary rounded-2xl">
+        <CardHeader><CardTitle className="text-xl font-black uppercase italic tracking-tighter">{editingId ? 'Editar' : 'Nuevo'} Artículo</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <Input value={newItem.name || ''} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="Nombre" />
-          <Input type="number" value={newItem.price || ''} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} placeholder="Precio Venta" />
-          <Button className="w-full h-14 font-black" onClick={saveItem} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'GUARDAR'}</Button>
+          <div className="space-y-1">
+            <Label className="text-[10px] font-black uppercase ml-1">Nombre del Producto</Label>
+            <Input value={newItem.name || ''} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="Ej: Hamburguesa Clásica" className="h-12 rounded-xl" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] font-black uppercase ml-1">Precio de Venta ($)</Label>
+            <Input type="number" value={newItem.price || ''} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} placeholder="0.00" className="h-12 rounded-xl" />
+          </div>
+          <Button className="w-full h-14 font-black text-lg mt-4" onClick={saveItem} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'GUARDAR ARTÍCULO'}</Button>
+          {editingId && <Button variant="ghost" className="w-full" onClick={() => {setEditingId(null); setNewItem(initialItemState);}}>Cancelar Edición</Button>}
         </CardContent>
       </Card>
-      <Card className="lg:col-span-2 shadow-xl"><CardContent className="pt-6">
+      <Card className="lg:col-span-2 shadow-xl rounded-2xl overflow-hidden"><CardContent className="pt-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{items.map(item => (
-          <div key={item.id} className="flex items-center justify-between p-4 border-2 rounded-2xl hover:bg-primary/5 transition-all">
-            <div className="font-bold">{item.name} (${item.price})</div>
+          <div key={item.id} className="flex items-center justify-between p-4 border-2 rounded-2xl hover:bg-primary/5 transition-all group">
+            <div>
+              <div className="font-black text-lg leading-tight uppercase italic">{item.name}</div>
+              <div className="text-primary font-bold text-sm tracking-tighter">${item.price.toFixed(2)}</div>
+            </div>
             <div className="flex gap-2">
-              <Button variant="ghost" size="icon" onClick={() => {setNewItem(item); setEditingId(item.id!);}}><Edit2 className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'menuItems', item.id!))}><Trash2 className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10" onClick={() => {setNewItem(item); setEditingId(item.id!);}}><Edit2 className="h-4 w-4 text-primary" /></Button>
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-destructive/10 text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'menuItems', item.id!))}><Trash2 className="h-4 w-4" /></Button>
             </div>
           </div>
         ))}</div>
@@ -187,17 +177,112 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
   );
 }
 
-function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: string }) {
-  return <div className="p-8 text-center opacity-40 italic">Módulo de Clientes en Sincronización...</div>;
+function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: string, locId: string }) {
+  const db = useFirestore();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const initialStaffState: Partial<UserProfile> = { name: '', email: '', role: 'cashier', pin: '', allowedLocIds: [locId] };
+  const [newUser, setNewUser] = useState<Partial<UserProfile>>(initialStaffState);
+
+  const saveStaffUser = async () => {
+    if (!newUser.name || !newUser.email || !newUser.pin) {
+      toast({ variant: 'destructive', title: 'Faltan datos', description: 'Nombre, Email y PIN son obligatorios.' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const path = collection(db, 'orgs', orgId, 'users');
+      const data = { ...newUser, orgId, updatedAt: Date.now() };
+      delete (data as any).id;
+      if (editingId) await updateDoc(doc(path, editingId), data);
+      else await addDoc(path, { ...data, uid: `STAFF-${Date.now()}`, createdAt: Date.now() });
+      setNewUser(initialStaffState);
+      setEditingId(null);
+      toast({ title: "Personal Actualizado" });
+    } catch (e) { toast({ variant: 'destructive', title: "Error al guardar empleado" }); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <Card className="border-t-4 border-primary shadow-xl rounded-2xl">
+        <CardHeader className="flex flex-row justify-between items-center">
+          <CardTitle className="font-black uppercase tracking-tighter italic text-2xl">{editingId ? 'Editar Colaborador' : 'Contratar Personal'}</CardTitle>
+          {editingId && <Button variant="ghost" size="sm" onClick={() => {setEditingId(null); setNewUser(initialStaffState);}}><X className="h-4 w-4" /></Button>}
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="p-6 bg-primary/5 rounded-[2rem] space-y-4">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black uppercase ml-1">Nombre Completo</Label>
+              <Input placeholder="Ej: Mario Rossi" value={newUser.name || ''} onChange={e => setNewUser({...newUser, name: e.target.value})} className="h-12 rounded-xl bg-white border-0" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black uppercase ml-1">Email de Acceso</Label>
+              <Input placeholder="mario@tienda.com" value={newUser.email || ''} onChange={e => setNewUser({...newUser, email: e.target.value})} className="h-12 rounded-xl bg-white border-0" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase ml-1">Rol en Tienda</Label>
+                <Select value={newUser.role} onValueChange={(v: any) => setNewUser({...newUser, role: v})}>
+                  <SelectTrigger className="h-12 rounded-xl bg-white border-0"><SelectValue placeholder="Rol" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="manager">Gerente</SelectItem>
+                    <SelectItem value="cashier">Cajero</SelectItem>
+                    <SelectItem value="kitchen">Cocina</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase ml-1">PIN de Acceso (4 dígitos)</Label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                  <Input placeholder="Ej: 1234" maxLength={4} className="pl-9 h-12 rounded-xl bg-white border-0 font-black tracking-widest" value={newUser.pin || ''} onChange={e => setNewUser({...newUser, pin: e.target.value})} />
+                </div>
+              </div>
+            </div>
+            <Button className="w-full h-14 font-black text-lg shadow-xl shadow-primary/20 rounded-2xl" onClick={saveStaffUser} disabled={loading}>{editingId ? 'ACTUALIZAR DATOS' : 'DAR DE ALTA'}</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-t-4 border-primary shadow-xl rounded-2xl">
+        <CardHeader><CardTitle className="font-black uppercase tracking-tighter italic text-2xl">Mi Equipo de Trabajo</CardTitle></CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[450px] pr-2">
+            <div className="space-y-3">{staff.map(u => (
+              <div key={u.id} className="flex justify-between items-center p-4 border-2 rounded-2xl bg-white shadow-sm hover:border-primary/30 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary uppercase">
+                    {u.name?.charAt(0) || 'U'}
+                  </div>
+                  <div>
+                    <div className="font-black text-base leading-none uppercase">{u.name}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                       <Badge variant="secondary" className="text-[10px] font-black uppercase">{u.role}</Badge>
+                       <span className="text-[10px] text-muted-foreground font-bold tracking-widest">PIN: {u.pin || '----'}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="rounded-full" onClick={() => {setNewUser(u); setEditingId(u.id!);}}><Edit2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-destructive rounded-full" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.id!))}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            ))}</div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
-function ConfigManager({ location, staff, orgId, locId }: { location?: Location, staff: UserProfile[], orgId: string, locId: string }) {
+function ConfigManager({ location, orgId, locId }: { location?: Location, orgId: string, locId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
   const [locForm, setLocForm] = useState<Partial<Location>>(location || { name: '', address: '', phoneNumber: '', taxRate: 0, logo: '' });
   const [loading, setLoading] = useState(false);
-  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState<Partial<UserProfile>>({ name: '', email: '', role: 'cashier', pin: '', allowedLocIds: [locId] });
 
   useEffect(() => { if (location) setLocForm(location); }, [location]);
 
@@ -208,79 +293,34 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
       delete (data as any).id;
       await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), data);
       toast({ title: "Sucursal Actualizada" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error" }); }
-    finally { setLoading(false); }
-  };
-
-  const saveStaffUser = async () => {
-    if (!newUser.name || !newUser.email) return;
-    setLoading(true);
-    try {
-      const path = collection(db, 'orgs', orgId, 'users');
-      const data = { ...newUser, orgId, updatedAt: Date.now() };
-      delete (data as any).id;
-      if (editingStaffId) await updateDoc(doc(path, editingStaffId), data);
-      else await addDoc(path, { ...data, uid: `STAFF-${Date.now()}`, createdAt: Date.now() });
-      setNewUser({ name: '', email: '', role: 'cashier', pin: '', allowedLocIds: [locId] });
-      setEditingStaffId(null);
-      toast({ title: "Personal Actualizado" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error" }); }
+    } catch (e) { toast({ variant: 'destructive', title: "Error al actualizar sucursal" }); }
     finally { setLoading(false); }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <Card className="border-t-4 border-primary shadow-xl">
-        <CardHeader><CardTitle className="font-black uppercase tracking-tighter">Perfil de Sede</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <Input value={locForm.name || ''} onChange={e => setLocForm({...locForm, name: e.target.value})} placeholder="Nombre Comercial" />
-          <Input value={locForm.address || ''} onChange={e => setLocForm({...locForm, address: e.target.value})} placeholder="Dirección" />
-          <Button className="w-full h-14 font-black" onClick={saveLocationDetails} disabled={loading}>GUARDAR CAMBIOS</Button>
-        </CardContent>
-      </Card>
-
-      <Card className="border-t-4 border-primary shadow-xl">
-        <CardHeader className="flex flex-row justify-between items-center">
-          <CardTitle className="font-black uppercase tracking-tighter">Equipo de Trabajo</CardTitle>
-          {editingStaffId && <Button variant="ghost" size="sm" onClick={() => {setEditingStaffId(null); setNewUser({name:'',email:'',role:'cashier',pin:'',allowedLocIds:[locId]});}}><X className="h-4 w-4" /></Button>}
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="p-4 bg-primary/5 rounded-2xl space-y-3">
-            <Input placeholder="Nombre" value={newUser.name || ''} onChange={e => setNewUser({...newUser, name: e.target.value})} />
-            <Input placeholder="Email" value={newUser.email || ''} onChange={e => setNewUser({...newUser, email: e.target.value})} />
-            <div className="flex gap-2">
-              <Select value={newUser.role} onValueChange={(v: any) => setNewUser({...newUser, role: v})}>
-                <SelectTrigger><SelectValue placeholder="Rol" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="manager">Gerente</SelectItem>
-                  <SelectItem value="cashier">Cajero</SelectItem>
-                  <SelectItem value="kitchen">Cocina</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="relative flex-1">
-                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="PIN (4 dig)" maxLength={4} className="pl-9" value={newUser.pin || ''} onChange={e => setNewUser({...newUser, pin: e.target.value})} />
-              </div>
-            </div>
-            <Button className="w-full h-12 font-black" onClick={saveStaffUser} disabled={loading}>{editingStaffId ? 'ACTUALIZAR' : 'CONTRATAR'}</Button>
+    <Card className="border-t-4 border-primary shadow-xl rounded-2xl max-w-2xl mx-auto">
+      <CardHeader><CardTitle className="font-black uppercase tracking-tighter italic text-2xl">Ajustes de la Sede</CardTitle></CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label className="text-[10px] font-black uppercase ml-1">Nombre Comercial de la Sucursal</Label>
+          <Input value={locForm.name || ''} onChange={e => setLocForm({...locForm, name: e.target.value})} placeholder="Ej: Sucursal Centro" className="h-12 rounded-xl" />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-[10px] font-black uppercase ml-1">Dirección Física</Label>
+          <Input value={locForm.address || ''} onChange={e => setLocForm({...locForm, address: e.target.value})} placeholder="Calle Falsa 123" className="h-12 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase ml-1">Teléfono / WhatsApp</Label>
+            <Input value={locForm.phoneNumber || ''} onChange={e => setLocForm({...locForm, phoneNumber: e.target.value})} placeholder="+54 11..." className="h-12 rounded-xl" />
           </div>
-          <ScrollArea className="h-64">
-            <div className="space-y-2">{staff.map(u => (
-              <div key={u.id} className="flex justify-between items-center p-4 border-2 rounded-2xl bg-white shadow-sm">
-                <div>
-                  <div className="font-black text-sm">{u.name}</div>
-                  <div className="text-[10px] font-bold text-primary uppercase">{u.role} • PIN: {u.pin || '----'}</div>
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => {setNewUser(u); setEditingStaffId(u.id!);}}><Edit2 className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.id!))}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-              </div>
-            ))}</div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-    </div>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase ml-1">Tasa de Impuesto (%)</Label>
+            <Input type="number" value={locForm.taxRate || 0} onChange={e => setLocForm({...locForm, taxRate: Number(e.target.value)})} placeholder="0.00" className="h-12 rounded-xl" />
+          </div>
+        </div>
+        <Button className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl mt-4" onClick={saveLocationDetails} disabled={loading}>GUARDAR CAMBIOS</Button>
+      </CardContent>
+    </Card>
   );
 }

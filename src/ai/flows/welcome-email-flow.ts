@@ -1,9 +1,9 @@
+
 'use server';
 /**
- * @fileOverview Genera el texto de un correo de bienvenida cálido y profesional.
+ * @fileOverview Genera el texto de un correo de bienvenida cálido y profesional usando una plantilla.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const WelcomeEmailInputSchema = z.object({
@@ -20,30 +20,32 @@ const WelcomeEmailOutputSchema = z.object({
 });
 export type WelcomeEmailOutput = z.infer<typeof WelcomeEmailOutputSchema>;
 
+/**
+ * Genera el correo de bienvenida usando una plantilla estática.
+ */
 export async function generateWelcomeEmail(input: WelcomeEmailInput): Promise<WelcomeEmailOutput> {
-  const {output} = await ai.generate({
-    model: 'googleai/gemini-2.5-flash',
-    input: {
-      schema: WelcomeEmailInputSchema,
-      data: input
-    },
-    output: {
-      schema: WelcomeEmailOutputSchema
-    },
-    prompt: `Eres el asistente oficial de Onboarding de RestauranteFlow. 
-    Genera un correo de bienvenida MUY cálido y profesional para un nuevo dueño de restaurante.
+  const subject = `¡Bienvenido a RestauranteFlow, ${input.userName}! 🚀`;
+  
+  const body = `
+    Hola ${input.userName},
     
-    Datos:
-    - Nombre: {{{userName}}}
-    - Email de Acceso: {{{userEmail}}}
-    - ID de Tienda (Store ID): {{{storeId}}}
-    - Contraseña: {{{password}}}
+    ¡Estamos muy emocionados de tenerte con nosotros en RestauranteFlow! Tu sistema ya está listo para transformar tu negocio gastronómico.
     
-    El correo debe incluir:
-    1. Una felicitación por unirse a la plataforma.
-    2. Los 3 datos de acceso claramente formateados.
-    3. Una breve explicación de que el Store ID es lo que identifica su terminal.
-    4. Un tono inspirador sobre el éxito de su negocio gastronómico.`,
-  });
-  return output!;
+    Aquí tienes tus credenciales de acceso para tu terminal y panel administrativo:
+    
+    -------------------------------------------
+    ID DE TIENDA: ${input.storeId} (¡Este es tu código de 6 dígitos!)
+    USUARIO: ${input.userEmail}
+    CONTRASEÑA: ${input.password}
+    -------------------------------------------
+    
+    Recuerda que el Store ID es lo que identifica a tu negocio y lo que tu personal usará para entrar al POS. 
+    
+    ¡Te deseamos mucho éxito en esta nueva etapa!
+    
+    Atentamente,
+    El equipo de RestauranteFlow
+  `;
+
+  return { subject, body };
 }

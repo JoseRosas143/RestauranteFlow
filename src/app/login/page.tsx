@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Store, Loader2, ShieldCheck, Building2, UserCircle } from 'lucide-react';
+import { Store, Loader2, ShieldCheck, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,8 +26,8 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!storeId) {
-      toast({ variant: "destructive", title: "Store ID Obligatorio", description: "Ingrese su código de tienda de 6 dígitos." });
+    if (!storeId || storeId.length !== 6) {
+      toast({ variant: "destructive", title: "Store ID Inválido", description: "Ingrese su código de tienda de 6 dígitos." });
       return;
     }
     
@@ -36,14 +36,14 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // Verificar Store ID
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.data();
       
-      // Soporte para tienda demo 143001 si el usuario es el dueño actual
-      const effectiveStoreId = storeId === '143001' ? userData?.orgId : storeId;
+      // Permitir acceso demo 143001 si el usuario está registrado correctamente
+      const isDemo = storeId === '143001';
+      const userOrgId = userData?.orgId;
 
-      if (userData?.orgId !== effectiveStoreId && storeId !== '143001') {
+      if (!isDemo && userOrgId !== storeId) {
         await signOut(auth);
         toast({
           variant: "destructive",
@@ -60,7 +60,7 @@ export default function LoginPage() {
       toast({
         variant: "destructive",
         title: "Error de acceso",
-        description: "Credenciales inválidas o servidor no responde."
+        description: "Credenciales inválidas o Store ID incorrecto."
       });
     } finally {
       setLoading(false);
@@ -68,8 +68,8 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!storeId) {
-      toast({ variant: "destructive", title: "Falta Store ID", description: "Para entrar con Google, ingrese primero su Store ID." });
+    if (!storeId || storeId.length !== 6) {
+      toast({ variant: "destructive", title: "Store ID Obligatorio", description: "Ingrese su ID de 6 dígitos antes de entrar con Google." });
       return;
     }
     setLoading(true);
@@ -113,13 +113,13 @@ export default function LoginPage() {
             <Store className="h-10 w-10 text-primary" />
           </div>
           <h1 className="text-5xl font-black tracking-tighter text-primary italic uppercase leading-none">RestauranteFlow</h1>
-          <p className="text-muted-foreground font-black text-xs uppercase tracking-[0.2em] opacity-60">Sistemas de Gestión Gastronómica</p>
+          <p className="text-muted-foreground font-black text-xs uppercase tracking-[0.2em] opacity-60">Professional POS Systems</p>
         </div>
 
         <Card className="shadow-2xl border-t-4 border-t-primary rounded-[2.5rem] overflow-hidden border-0">
           <CardHeader className="bg-muted/30 pb-8 text-center pt-10">
             <CardTitle className="text-2xl font-black uppercase italic tracking-tighter">Portal de Acceso</CardTitle>
-            <CardDescription className="text-[10px] font-bold uppercase tracking-widest mt-1">Ingrese sus credenciales de terminal</CardDescription>
+            <CardDescription className="text-[10px] font-bold uppercase tracking-widest mt-1">Ingrese el ID de su negocio</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pt-10 px-8">
             <form onSubmit={handleLogin} className="space-y-5">
@@ -131,9 +131,10 @@ export default function LoginPage() {
                   id="storeId" 
                   placeholder="Ej: 143001" 
                   value={storeId}
+                  maxLength={6}
                   onChange={(e) => setStoreId(e.target.value)}
                   required
-                  className="bg-muted/50 h-14 rounded-2xl border-0 focus-visible:ring-primary font-black text-lg px-6"
+                  className="bg-muted/50 h-14 rounded-2xl border-0 focus-visible:ring-primary font-black text-center text-2xl tracking-[0.2em] px-6"
                 />
               </div>
 
@@ -184,7 +185,7 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="bg-muted/20 p-6 border-t flex flex-col items-center gap-3">
             <span className="text-[10px] text-muted-foreground flex items-center gap-2 font-black uppercase tracking-widest">
-              <ShieldCheck className="h-3 w-3 text-primary" /> Conexión Segura de Grado Bancario
+              <ShieldCheck className="h-3 w-3 text-primary" /> Conexión Segura Cifrada
             </span>
           </CardFooter>
         </Card>

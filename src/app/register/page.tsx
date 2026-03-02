@@ -1,15 +1,16 @@
+
 "use client"
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useFirestore } from '@/firebase';
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Rocket, Loader2, ShieldCheck, Mail } from 'lucide-react';
+import { Rocket, Loader2, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { generateWelcomeEmail } from '@/ai/flows/welcome-email-flow';
@@ -38,16 +39,17 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
+      // Para la primera tienda demo, usaremos 143001 si está libre o generaremos uno.
+      // Aquí generamos uno aleatorio de 6 dígitos para cumplir con la arquitectura comercial.
       const newStoreId = generateStoreId();
       
-      // Crear perfil global con Store ID real
+      // Crear perfil global
       await setDoc(doc(db, 'users', user.uid), {
         id: user.uid,
         firstName: name.split(' ')[0],
         lastName: name.split(' ').slice(1).join(' ') || '',
         email: email,
-        role: 'Admin',
-        branchId: '',
+        role: 'admin',
         orgId: newStoreId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -61,7 +63,7 @@ export default function RegisterPage() {
         createdAt: Date.now()
       });
 
-      // Simular envío de correo con IA
+      // Envío de correo de bienvenida (simulado)
       try {
         const emailContent = await generateWelcomeEmail({
           userName: name,
@@ -69,19 +71,15 @@ export default function RegisterPage() {
           storeId: newStoreId,
           password: password
         });
-        console.log("SIMULATED EMAIL SENT:", emailContent);
+        console.log("SIMULATED WELCOME EMAIL:", emailContent);
         toast({ 
-          title: "¡Correo de bienvenida enviado!", 
-          description: "Revisa tu bandeja de entrada (simulado en consola)." 
+          title: "¡Bienvenido a bordo!", 
+          description: `Tu ID de Tienda es ${newStoreId}. Revisa tu consola para ver el correo de bienvenida.` 
         });
       } catch (err) {
-        console.error("AI Email failed", err);
+        console.error("Email simulation failed", err);
       }
 
-      toast({ 
-        title: "¡Bienvenido a RestauranteFlow!", 
-        description: `Tu ID de Tienda es: ${newStoreId}.` 
-      });
       router.push('/admin');
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error al registrar", description: error.message });
