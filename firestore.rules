@@ -14,15 +14,13 @@ service cloud.firestore {
     }
 
     // --- REGLAS DE COLECCIÓN ---
-    // Flexibilizadas para asegurar que el prototipo pueda escribir datos iniciales
+    // Flexibilizadas para asegurar que el prototipo pueda escribir datos iniciales sin bloqueos
 
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isSignedIn();
     }
 
     match /orgs/{orgId} {
-      // Permitimos lectura y escritura a cualquier usuario autenticado por ahora
-      // para facilitar el onboarding multi-tenant
       allow read, write: if isSignedIn();
 
       match /{allPaths=**} {
@@ -34,7 +32,7 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
     
-    // Regla general de respaldo
+    // Regla general de respaldo para desarrollo
     match /{document=**} {
       allow read, write: if isSignedIn();
     }

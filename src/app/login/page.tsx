@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useFirestore } from '@/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,10 +29,9 @@ export default function LoginPage() {
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
       
-      let finalOrgId = targetStoreId;
-
+      // Forzamos que el perfil tenga el Store ID de 6 dígitos
       if (!userDoc.exists()) {
-        const newUser = {
+        await setDoc(userDocRef, {
           id: user.uid,
           uid: user.uid,
           email: user.email,
@@ -40,30 +39,27 @@ export default function LoginPage() {
           orgId: targetStoreId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        };
-        await setDoc(userDocRef, newUser);
+        });
       } else {
-        const data = userDoc.data();
-        if (!data.orgId) {
-          await updateDoc(userDocRef, { orgId: targetStoreId, updatedAt: new Date().toISOString() });
-        } else {
-          finalOrgId = data.orgId;
-        }
+        await updateDoc(userDocRef, { 
+          orgId: targetStoreId, 
+          updatedAt: new Date().toISOString() 
+        });
       }
 
-      // Aseguramos que la organización exista siempre
-      const orgDocRef = doc(db, 'orgs', finalOrgId);
+      // Aseguramos que la organización (Negocio) exista con ese ID de 6 dígitos
+      const orgDocRef = doc(db, 'orgs', targetStoreId);
       const orgDoc = await getDoc(orgDocRef);
       if (!orgDoc.exists()) {
         await setDoc(orgDocRef, {
-          id: finalOrgId,
+          id: targetStoreId,
           name: 'Mi Restaurante',
           ownerUid: user.uid,
           createdAt: Date.now()
         });
       }
 
-      return { orgId: finalOrgId };
+      return { orgId: targetStoreId };
     } catch (error: any) {
       console.error("Error in syncUserProfile:", error);
       throw error;
@@ -80,11 +76,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      await syncUserProfile(userCredential.user, storeId);
       
-      await syncUserProfile(user, storeId);
-      
-      toast({ title: "Acceso Exitoso", description: "Iniciando sesión..." });
+      toast({ title: "Acceso Exitoso", description: "Cargando panel de control..." });
       router.push('/admin');
     } catch (error: any) {
       toast({
@@ -184,7 +178,7 @@ export default function LoginPage() {
 
             <div className="relative py-2">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-[10px] uppercase font-black"><span className="bg-background px-4 text-muted-foreground">Acceso Corporativo</span></div>
+              <div className="relative flex justify-center text-[10px] uppercase font-black"><span className="bg-background px-4 text-muted-foreground">O accede con</span></div>
             </div>
 
             <Button variant="outline" type="button" className="w-full h-14 font-black border-2 rounded-2xl" onClick={handleGoogleLogin} disabled={loading}>
