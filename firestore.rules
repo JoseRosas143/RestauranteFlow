@@ -1,62 +1,186 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Funciones de validación centralizadas
-    function isSignedIn() { return request.auth != null; }
-    function isMember(orgId) { return isSignedIn() && get(/databases/$(database)/documents/orgs/$(orgId)/users/$(request.auth.uid)).data.orgId == orgId; }
-    function hasAccessToLoc(orgId, locId) { return isMember(orgId) && locId in get(/databases/$(database)/documents/orgs/$(orgId)/users/$(request.auth.uid)).data.allowedLocIds; }
-    function hasRole(orgId, role) { return isMember(orgId) && get(/databases/$(database)/documents/orgs/$(orgId)/users/$(request.auth.uid)).data.role == role; }
 
-    // Segmentación Multi-Tenant
-    match /orgs/{orgId} {
-      allow read: if isSignedIn(); // Para ver nombres de orgs
-      allow write: if hasRole(orgId, 'admin');
+    /**
+     * CHORIPANFLOW SECURITY RULES
+     *
+     * Core Philosophy: 
+     * This ruleset implements a Branch-Based Access Control (BBAC) model. Access to business 
+     * data (menu, orders, tickets) is strictly partitioned by branch. User roles are 
+     * localized to branches to ensure that a cashier in one branch cannot access 
+     * data from another.
+     *
+     * Data Structure:
+     * 1. /users/{userId}: Global user profiles.
+     * 2. /branches/{branchId}: Root business entities.
+     * 3. /branches/{branchId}/user_roles/{userId}: Authorization context for members.
+     * 4. /branches/{branchId}/...: All operational data (Menu, Orders, Tickets).
+     *
+     * Key Security Decisions:
+     * - Authorization Independence: Every document in a branch subcollection includes 
+     *   a denormalized 'branchId' for fast, non-recursive rule evaluation.
+     * - DBAC (Database-Based Access Control): Roles are fetched from the 'user_roles' 
+     *   subcollection, avoiding dependency on Custom Claims and allowing for 
+     *   instant permission updates.
+     * - Prototyping Mode: Schema validation is relaxed to allow rapid UI iteration, 
+     *   enforcing only critical relational fields (ids and ownership).
+     */
 
-      match /users/{userId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-        allow write: if hasRole(orgId, 'admin');
-      }
+    // --- GLOBAL HELPER FUNCTIONS ---
 
-      match /customers/{customerId} {
-        allow read, write: if isMember(orgId);
-      }
-
-      match /settings/{settingId} {
-        allow read: if isMember(orgId);
-        allow write: if hasRole(orgId, 'admin');
-      }
-
-      match /locations/{locId} {
-        allow read: if isMember(orgId);
-        allow write: if hasRole(orgId, 'admin');
-
-        match /menuItems/{itemId} {
-          allow read: if hasAccessToLoc(orgId, locId);
-          allow write: if hasRole(orgId, 'admin') || hasRole(orgId, 'manager');
-        }
-
-        match /orders/{orderId} {
-          allow read: if hasAccessToLoc(orgId, locId);
-          allow write: if hasAccessToLoc(orgId, locId) && (hasRole(orgId, 'cashier') || hasRole(orgId, 'admin'));
-        }
-
-        match /kitchenTickets/{ticketId} {
-          allow read: if hasAccessToLoc(orgId, locId);
-          allow write: if hasAccessToLoc(orgId, locId) && (hasRole(orgId, 'kitchen') || hasRole(orgId, 'admin'));
-        }
-
-        match /analytics/{doc=**} {
-          allow read: if hasRole(orgId, 'admin') || hasRole(orgId, 'manager');
-          allow write: if false; // Solo vía transacciones/cloud functions desde el server o validación estricta
-        }
-      }
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Permitir acceso total para el prototipo (QUITAR ESTO EN PRODUCCIÓN)
-    match /{document=**} {
-      allow read, write: if true;
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    // Checks if the user has an entry in the branch's local roles collection
+    function isBranchMember(branchId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/branches/$(branchId)/user_roles/$(request.auth.uid));
+    }
+
+    // Retrieves the user's specific role within a branch
+    function getBranchRole(branchId) {
+      return get(/databases/$(database)/documents/branches/$(branchId)/user_roles/$(request.auth.uid)).data.role;
+    }
+
+    function isBranchAdmin(branchId) {
+      return isBranchMember(branchId) && getBranchRole(branchId) == 'Admin';
+    }
+
+    // Validates that the branchId in the data matches the path to prevent data leaking
+    function isDataConsistentWithBranch(branchId) {
+      return request.resource.data.branchId == branchId;
+    }
+
+    // --- COLLECTION RULES ---
+
+    /**
+     * @description Rules for global User profiles. Users can manage their own profile.
+     * @path /users/{userId}
+     * @allow (get, list, create, update) if the authenticated user matches the userId.
+     * @deny (create) if the user tries to create a profile for a different UID.
+     * @principle Ownership and Self-Creation.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if false; // Profiles are generally persistent in this app context.
+    }
+
+    /**
+     * @description Rules for Branch entities. Read access is restricted to members. 
+     * Creation is open to signed-in users (for onboarding).
+     * @path /branches/{branchId}
+     * @allow (create) any signed-in user (initial onboarding).
+     * @allow (get) any member of the branch.
+     * @deny (update) if the user is not a branch Admin.
+     * @principle Roles and Shared Access.
+     */
+    match /branches/{branchId} {
+      allow get: if isBranchMember(branchId);
+      allow list: if false; // Global listing of branches is not allowed for privacy.
+      allow create: if isSignedIn();
+      allow update: if isBranchAdmin(branchId);
+      allow delete: if false; // Destructive deletion requires system-level access.
+
+      /**
+       * @description Maps users to roles within a branch. Critical for authorization.
+       * @path /branches/{branchId}/user_roles/{userId}
+       * @allow (create) if the user is an owner setting up their branch (onboarding).
+       * @principle DBAC (Database-Based Access Control).
+       */
+      match /user_roles/{roleUserId} {
+        allow get: if isBranchMember(branchId);
+        allow list: if isBranchMember(branchId);
+        allow create: if isOwner(roleUserId) || isBranchAdmin(branchId);
+        allow update: if isBranchAdmin(branchId);
+        allow delete: if isBranchAdmin(branchId);
+      }
+
+      /**
+       * @description Branch-specific Menu Categories.
+       * @path /branches/{branchId}/menuCategories/{categoryId}
+       * @allow (read) all branch members. (write) branch admins.
+       * @principle Shared Access with Role-based writes.
+       */
+      match /menuCategories/{categoryId} {
+        allow get, list: if isBranchMember(branchId);
+        allow create: if isBranchAdmin(branchId) && isDataConsistentWithBranch(branchId);
+        allow update: if isBranchAdmin(branchId) && isDataConsistentWithBranch(branchId);
+        allow delete: if isBranchAdmin(branchId);
+      }
+
+      /**
+       * @description Branch-specific Menu Items.
+       * @path /branches/{branchId}/menuItems/{menuItemId}
+       * @allow (read) all branch members. (write) branch admins.
+       * @principle Shared Access with Role-based writes.
+       */
+      match /menuItems/{menuItemId} {
+        allow get, list: if isBranchMember(branchId);
+        allow create: if isBranchAdmin(branchId) && isDataConsistentWithBranch(branchId);
+        allow update: if isBranchAdmin(branchId) && isDataConsistentWithBranch(branchId);
+        allow delete: if isBranchAdmin(branchId);
+      }
+
+      /**
+       * @description Orders placed at the branch. 
+       * @path /branches/{branchId}/orders/{orderId}
+       * @allow (read, write) all branch members (Cashiers, Admins).
+       * @principle Shared Access (Closed Collaborators).
+       */
+      match /orders/{orderId} {
+        allow get, list: if isBranchMember(branchId);
+        allow create: if isBranchMember(branchId) && isDataConsistentWithBranch(branchId);
+        allow update: if isBranchMember(branchId) && isDataConsistentWithBranch(branchId);
+        allow delete: if isBranchAdmin(branchId);
+
+        /**
+         * @description Line items within an order.
+         * @path /branches/{branchId}/orders/{orderId}/orderItems/{orderItemId}
+         * @principle Path-based authorization with denormalized branch check.
+         */
+        match /orderItems/{orderItemId} {
+          allow get, list: if isBranchMember(branchId);
+          allow create: if isBranchMember(branchId) && isDataConsistentWithBranch(branchId);
+          allow update: if isBranchMember(branchId) && isDataConsistentWithBranch(branchId);
+          allow delete: if isBranchMember(branchId);
+        }
+
+        /**
+         * @description Payments associated with an order.
+         * @path /branches/{branchId}/orders/{orderId}/payments/{paymentId}
+         * @principle Relational integrity and shared branch access.
+         */
+        match /payments/{paymentId} {
+          allow get, list: if isBranchMember(branchId);
+          allow create: if isBranchMember(branchId) && isDataConsistentWithBranch(branchId);
+          allow update: if isBranchMember(branchId) && isDataConsistentWithBranch(branchId);
+          allow delete: if isBranchAdmin(branchId);
+        }
+      }
+
+      /**
+       * @description Kitchen workflow tickets.
+       * @path /branches/{branchId}/kitchenTickets/{ticketId}
+       * @allow (read, write) all branch members (Kitchen Staff, Cashiers, Admins).
+       * @principle Shared access for operational workflow.
+       */
+      match /kitchenTickets/{ticketId} {
+        allow get, list: if isBranchMember(branchId);
+        allow create: if isBranchMember(branchId) && isDataConsistentWithBranch(branchId);
+        allow update: if isBranchMember(branchId) && isDataConsistentWithBranch(branchId);
+        allow delete: if isBranchAdmin(branchId);
+      }
     }
   }
 }

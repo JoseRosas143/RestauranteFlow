@@ -1,47 +1,635 @@
-
 {
   "entities": {
-    "MenuItem": {
-      "title": "MenuItem",
-      "description": "Producto del menú con soporte para modificadores e inventario.",
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
       "type": "object",
+      "description": "Represents a user of the ChoripanFlow application, such as a cashier, administrator, or kitchen staff. This entity stores profile information and links the user to their assigned branch and role.",
       "properties": {
-        "name": { "type": "string" },
-        "price": { "type": "number" },
-        "cost": { "type": "number" },
-        "category": { "type": "string" },
-        "modifiers": { "type": "array", "items": { "type": "string" } },
-        "tpvColor": { "type": "string" },
-        "tpvShape": { "type": "string" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user, used for communication and identification.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user within the application (e.g., 'Admin', 'Cashier', 'KitchenStaff'), determining their access and permissions."
+        },
+        "branchId": {
+          "type": "string",
+          "description": "Reference to the Branch where the user is primarily assigned. (Relationship: Branch 1:N User)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "role",
+        "branchId",
+        "createdAt",
+        "updatedAt"
+      ]
     },
-    "Customer": {
-      "title": "Customer",
-      "description": "Perfil de cliente para sistema de lealtad.",
+    "Branch": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Branch",
       "type": "object",
+      "description": "Represents a physical location or store of the ChoripanFlow business. Each branch has its own menu, orders, and associated users.",
       "properties": {
-        "name": { "type": "string" },
-        "points": { "type": "number" },
-        "totalVisits": { "type": "number" },
-        "lastVisit": { "type": "number" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Branch entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The official name of the branch."
+        },
+        "address": {
+          "type": "string",
+          "description": "The physical address of the branch location."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The contact phone number for the branch."
+        },
+        "taxRate": {
+          "type": "number",
+          "description": "The applicable tax rate for sales at this branch (e.g., 0.08 for 8%)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the branch record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the branch record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "address",
+        "phoneNumber",
+        "taxRate",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MenuCategory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MenuCategory",
+      "type": "object",
+      "description": "Organizes menu items into logical groups (e.g., 'Appetizers', 'Main Courses', 'Drinks') for easier navigation and management.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the MenuCategory entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the menu category (e.g., 'Sandwiches')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of what this category entails."
+        },
+        "branchId": {
+          "type": "string",
+          "description": "Reference to the Branch to which this menu category belongs. (Relationship: Branch 1:N MenuCategory)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the menu category was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the menu category was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "branchId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MenuItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MenuItem",
+      "type": "object",
+      "description": "Represents a single item available on the menu, including its price, description, and category.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the MenuItem entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the menu item (e.g., 'Classic Choripan')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the menu item, including ingredients or customization options."
+        },
+        "price": {
+          "type": "number",
+          "description": "The standard selling price of the menu item."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "An optional URL to an image of the menu item.",
+          "format": "uri"
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to the MenuCategory this item belongs to. (Relationship: MenuCategory 1:N MenuItem)"
+        },
+        "branchId": {
+          "type": "string",
+          "description": "Reference to the Branch where this menu item is available. (Relationship: Branch 1:N MenuItem)"
+        },
+        "isAvailable": {
+          "type": "boolean",
+          "description": "Indicates whether the menu item is currently available for purchase."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the menu item was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the menu item was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "price",
+        "categoryId",
+        "branchId",
+        "isAvailable",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "Order": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Order",
       "type": "object",
+      "description": "Represents a customer's purchase transaction, tracking its status, totals, and associated payments.",
       "properties": {
-        "status": { "type": "string", "enum": ["draft", "open", "confirmed", "paid"] },
-        "serviceType": { "type": "string", "enum": ["mesa", "llevar", "domicilio", "rappi", "ubereats", "didifood"] },
-        "items": { "type": "array" },
-        "total": { "type": "number" },
-        "customerId": { "type": "string" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Order entity."
+        },
+        "orderNumber": {
+          "type": "string",
+          "description": "A human-readable identifier for the order, unique within a branch."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the order (e.g., 'draft', 'confirmed', 'paid', 'cancelled', 'completed')."
+        },
+        "subtotal": {
+          "type": "number",
+          "description": "The sum of all item prices in the order before tax."
+        },
+        "taxAmount": {
+          "type": "number",
+          "description": "The calculated tax amount for the order."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The grand total amount due for the order (subtotal + tax)."
+        },
+        "amountPaid": {
+          "type": "number",
+          "description": "The cumulative amount paid towards this order through various payments."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the order was initially created.",
+          "format": "date-time"
+        },
+        "confirmedAt": {
+          "type": "string",
+          "description": "Optional timestamp when the order was confirmed and sent to the kitchen.",
+          "format": "date-time"
+        },
+        "completedAt": {
+          "type": "string",
+          "description": "Optional timestamp when the order was fully paid and completed.",
+          "format": "date-time"
+        },
+        "cashierId": {
+          "type": "string",
+          "description": "Reference to the User (cashier) who created or last modified this order. (Relationship: User 1:N Order)"
+        },
+        "branchId": {
+          "type": "string",
+          "description": "Reference to the Branch where this order was placed. (Relationship: Branch 1:N Order)"
+        }
+      },
+      "required": [
+        "id",
+        "orderNumber",
+        "status",
+        "subtotal",
+        "taxAmount",
+        "totalAmount",
+        "amountPaid",
+        "createdAt",
+        "cashierId",
+        "branchId"
+      ]
+    },
+    "OrderItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OrderItem",
+      "type": "object",
+      "description": "Represents a specific menu item included in an order, capturing its quantity and price at the time of purchase.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the OrderItem entity."
+        },
+        "orderId": {
+          "type": "string",
+          "description": "Reference to the Order this item belongs to. (Relationship: Order 1:N OrderItem)"
+        },
+        "menuItemId": {
+          "type": "string",
+          "description": "Reference to the MenuItem that was purchased. (Relationship: MenuItem 1:N OrderItem)"
+        },
+        "itemName": {
+          "type": "string",
+          "description": "A snapshot of the menu item's name at the time of order, for historical accuracy."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The number of units of this menu item purchased."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "The price of one unit of the item at the time the order was confirmed, locked to prevent changes."
+        },
+        "totalPrice": {
+          "type": "number",
+          "description": "The total price for this specific order item (quantity * unitPrice)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the order item was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the order item was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "orderId",
+        "menuItemId",
+        "itemName",
+        "quantity",
+        "unitPrice",
+        "totalPrice",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Records a single payment made towards an order, including the amount, method, and processing cashier.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Payment entity."
+        },
+        "orderId": {
+          "type": "string",
+          "description": "Reference to the Order this payment is for. (Relationship: Order 1:N Payment)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount of money processed in this payment."
+        },
+        "method": {
+          "type": "string",
+          "description": "The payment method used (e.g., 'Cash', 'Credit Card', 'Debit Card', 'Mobile Pay')."
+        },
+        "paymentDate": {
+          "type": "string",
+          "description": "Timestamp when the payment was recorded.",
+          "format": "date-time"
+        },
+        "cashierId": {
+          "type": "string",
+          "description": "Reference to the User (cashier) who processed this payment. (Relationship: User 1:N Payment)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the payment record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the payment record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "orderId",
+        "amount",
+        "method",
+        "paymentDate",
+        "cashierId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "KitchenTicket": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "KitchenTicket",
+      "type": "object",
+      "description": "Represents a ticket generated for the kitchen staff, detailing the items to be prepared for a confirmed order and tracking their preparation status.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the KitchenTicket entity."
+        },
+        "orderId": {
+          "type": "string",
+          "description": "Reference to the Order for which this kitchen ticket was generated. (Relationship: Order 1:N KitchenTicket)"
+        },
+        "status": {
+          "type": "string",
+          "description": "The current preparation status of the kitchen ticket (e.g., 'New', 'Preparing', 'Ready', 'Served', 'Cancelled')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the kitchen ticket was created/generated.",
+          "format": "date-time"
+        },
+        "startedPreparingAt": {
+          "type": "string",
+          "description": "Optional timestamp when kitchen staff started preparing the items on this ticket.",
+          "format": "date-time"
+        },
+        "readyAt": {
+          "type": "string",
+          "description": "Optional timestamp when all items on this ticket were ready for pickup/serving.",
+          "format": "date-time"
+        },
+        "servedAt": {
+          "type": "string",
+          "description": "Optional timestamp when the items on this ticket were served to the customer.",
+          "format": "date-time"
+        },
+        "branchId": {
+          "type": "string",
+          "description": "Reference to the Branch where this kitchen ticket originated, for KDS filtering. (Relationship: Branch 1:N KitchenTicket)"
+        },
+        "cashierId": {
+          "type": "string",
+          "description": "Reference to the User (cashier) who confirmed the order, useful for kitchen communication. (Relationship: User 1:N KitchenTicket)"
+        }
+      },
+      "required": [
+        "id",
+        "orderId",
+        "status",
+        "createdAt",
+        "branchId",
+        "cashierId"
+      ]
     }
   },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
   "firestore": {
-    "/menu/{itemId}": { "schema": "MenuItem" },
-    "/customers/{customerId}": { "schema": "Customer" },
-    "/orders/{orderId}": { "schema": "Order" },
-    "/tickets/{ticketId}": { "schema": "KitchenTicket" }
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores individual user profiles. The 'id' field matches 'request.auth.uid'. Includes primary 'role' and 'branchId' which are the source of truth, but denormalized into 'BranchUserRole' documents for efficient authorization checks.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user, matching Firebase Authentication UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/branches/{branchId}",
+        "definition": {
+          "entityName": "Branch",
+          "schema": {
+            "$ref": "#/backend/entities/Branch"
+          },
+          "description": "Top-level collection for each physical business branch, storing its details.",
+          "params": [
+            {
+              "name": "branchId",
+              "description": "The unique identifier for the branch."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/branches/{branchId}/user_roles/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Auxiliary collection for robust, authorization-independent role checks. Each document in this subcollection indicates a 'User's 'role' within a specific 'Branch'. This structure enables efficient 'exists()' checks in security rules, avoiding 'get()' calls on the root '/users' collection. This document only needs to store the 'role' field (e.g., { role: 'Admin' }). This must be kept in sync with the primary User document.",
+          "params": [
+            {
+              "name": "branchId",
+              "description": "The unique identifier of the branch."
+            },
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user associated with this role in the branch."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/branches/{branchId}/menuCategories/{categoryId}",
+        "definition": {
+          "entityName": "MenuCategory",
+          "schema": {
+            "$ref": "#/backend/entities/MenuCategory"
+          },
+          "description": "Categories for menu items, specific to each branch. Includes denormalized 'branchId' for efficient access and authorization independence.",
+          "params": [
+            {
+              "name": "branchId",
+              "description": "The unique identifier of the branch."
+            },
+            {
+              "name": "categoryId",
+              "description": "The unique identifier of the menu category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/branches/{branchId}/menuItems/{menuItemId}",
+        "definition": {
+          "entityName": "MenuItem",
+          "schema": {
+            "$ref": "#/backend/entities/MenuItem"
+          },
+          "description": "Individual menu items available at a specific branch. Includes denormalized 'branchId' and 'categoryId' for efficient access and authorization independence.",
+          "params": [
+            {
+              "name": "branchId",
+              "description": "The unique identifier of the branch."
+            },
+            {
+              "name": "menuItemId",
+              "description": "The unique identifier of the menu item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/branches/{branchId}/orders/{orderId}",
+        "definition": {
+          "entityName": "Order",
+          "schema": {
+            "$ref": "#/backend/entities/Order"
+          },
+          "description": "Customer orders placed at a specific branch. Includes denormalized 'branchId' and 'cashierId' for robust authorization and query capabilities.",
+          "params": [
+            {
+              "name": "branchId",
+              "description": "The unique identifier of the branch where the order was placed."
+            },
+            {
+              "name": "orderId",
+              "description": "The unique identifier of the order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/branches/{branchId}/orders/{orderId}/orderItems/{orderItemId}",
+        "definition": {
+          "entityName": "OrderItem",
+          "schema": {
+            "$ref": "#/backend/entities/OrderItem"
+          },
+          "description": "Individual items within an 'Order'. For authorization independence, the schema **must be extended** to include 'branchId' and 'cashierId' in addition to existing 'orderId' and 'menuItemId'. These denormalized fields enable direct rule checks without parent document lookups.",
+          "params": [
+            {
+              "name": "branchId",
+              "description": "The unique identifier of the branch related to the order (denormalized)."
+            },
+            {
+              "name": "orderId",
+              "description": "The unique identifier of the parent order."
+            },
+            {
+              "name": "orderItemId",
+              "description": "The unique identifier of the order item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/branches/{branchId}/orders/{orderId}/payments/{paymentId}",
+        "definition": {
+          "entityName": "Payment",
+          "schema": {
+            "$ref": "#/backend/entities/Payment"
+          },
+          "description": "Records individual payments made against an 'Order'. For authorization independence, the schema **must be extended** to include 'branchId' in addition to existing 'orderId' and 'cashierId'. This denormalized field enables direct rule checks without parent document lookups.",
+          "params": [
+            {
+              "name": "branchId",
+              "description": "The unique identifier of the branch related to the order (denormalized)."
+            },
+            {
+              "name": "orderId",
+              "description": "The unique identifier of the parent order."
+            },
+            {
+              "name": "paymentId",
+              "description": "The unique identifier of the payment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/branches/{branchId}/kitchenTickets/{ticketId}",
+        "definition": {
+          "entityName": "KitchenTicket",
+          "schema": {
+            "$ref": "#/backend/entities/KitchenTicket"
+          },
+          "description": "Tickets for kitchen staff detailing items to prepare for an 'Order'. Includes denormalized 'branchId', 'orderId', and 'cashierId' for efficient KDS filtering and authorization.",
+          "params": [
+            {
+              "name": "branchId",
+              "description": "The unique identifier of the branch where the kitchen ticket originated."
+            },
+            {
+              "name": "ticketId",
+              "description": "The unique identifier of the kitchen ticket."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure for ChoripanFlow is designed to maximize security, scalability, and debuggability by adhering strictly to the core design principles, especially Authorization Independence and QAPs.\n\n**Authorization Independence (CRITICAL):** This is achieved primarily through two mechanisms:\n1.  **Denormalized `branchId` and `cashierId`:** Every document in subcollections under `/branches/{branchId}` (e.g., `menuCategories`, `menuItems`, `orders`, `kitchenTickets`, `orderItems`, `payments`) explicitly stores its associated `branchId`. This eliminates the need for `get()` calls to parent `Branch` documents when authorizing access to subcollection data. For `OrderItem` and `Payment` entities, their schemas **must be extended** to include `branchId` (and `cashierId` for `OrderItem`) to ensure this independence. The `cashierId` is also denormalized into `Order` and `KitchenTicket` documents for similar reasons.\n2.  **`user_roles` Subcollection:** To avoid `get()` calls on the global `/users/{userId}` collection for determining a user's branch and role context, a dedicated auxiliary collection `user_roles` is introduced under each branch: `/branches/{branchId}/user_roles/{userId}`. A document in this collection signifies that `userId` is authorized for `branchId` and contains their `role`. This enables efficient `exists()` checks directly on the relevant branch-specific authorization context in security rules.\n\n**Clarity of Intent (Debuggability):** The hierarchical path structure (`/branches/{branchId}/...`) clearly delineates ownership and relationships. Denormalized fields such as `branchId` and `cashierId` explicitly state the authorization context within each document, making security rules simpler and more transparent. Wildcards are descriptive (e.g., `{branchId}`, `{orderId}`).\n\n**DBAC (No Custom Claims):** User roles and branch assignments are stored in the database. The `User` document (`/users/{userId}`) acts as the source of truth for a user's primary `branchId` and `role`. However, for *rule evaluation*, the denormalized `user_roles` collection (`/branches/{branchId}/user_roles/{userId}`) is used for `exists()` checks and `get().data.role` lookups, removing the dependency on `request.auth.token.claims`.\n\n**QAPs (Rules are not Filters):**\n-   The structural segregation of all transactional and menu data under `/branches/{branchId}`, combined with the `user_roles` subcollection, directly supports QAPs. A user attempting to `list` documents in any branch-specific collection (e.g., `/branches/{branchId}/menuItems`) can only do so if their `request.auth.uid` corresponds to an `exists()` check in `/branches/{branchId}/user_roles/$(request.auth.uid)`. This ensures that `list` queries are inherently secure and do not return unauthorized data.\n-   Further, specific role checks (`get(/branches/$(branchId)/user_roles/$(request.auth.uid)).data.role == 'Admin'`) can be used to restrict write/update operations for different entity types, ensuring rules are not used as filters for write operations.\n\n**Invariants:** The structure supports invariants by consistently storing ownership (`cashierId`), timestamps (`createdAt`, `updatedAt`), and explicitly managing denormalized data to maintain consistency across related documents through atomic writes or Cloud Functions triggers. Explicit `status` fields (`Order.status`, `KitchenTicket.status`) ensure predictable state management.\n\n**Onboarding and Branch Configuration:** Upon user registration and subsequent onboarding, a new `Branch` document is created in `/branches/{newBranchId}`. The user's `/users/{userId}` document is updated with `newBranchId` and `role: \"Admin\"`. Crucially, a corresponding document is then created in `/branches/{newBranchId}/user_roles/{userId}` with `role: \"Admin\"`. This ensures the newly registered admin has immediate and secure access to configure their new branch, satisfying the user's request."
   }
 }
