@@ -8,9 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, CheckCircle, Flame, ChefHat, Bell, Loader2, ArrowLeft } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, doc, updateDoc, query, orderBy, where } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 const STATUS_CONFIG = {
@@ -23,17 +23,24 @@ const STATUS_CONFIG = {
 export default function KdsContainer() {
   const db = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
   
+  // Simplificamos la query para evitar problemas de índices compuestos en el prototipo
+  // Traemos todos y filtramos los "servidos" en el lado del cliente para máxima estabilidad
   const ticketsQuery = useMemo(() => 
     query(
       collection(db, 'tickets'), 
-      where('status', '!=', 'served'), 
-      orderBy('status', 'asc'), 
       orderBy('timestamp', 'asc')
     ), [db]
   );
 
-  const { data: tickets, loading } = useCollection<KitchenTicket>(ticketsQuery);
+  const { data: allTickets, loading } = useCollection<KitchenTicket>(ticketsQuery);
+
+  // Filtrar tickets que no han sido servidos aún
+  const tickets = useMemo(() => 
+    allTickets.filter(t => t.status !== 'served'), 
+    [allTickets]
+  );
 
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -56,7 +63,7 @@ export default function KdsContainer() {
 
   const getElapsedTime = (timestamp: number) => {
     const mins = Math.floor((now - timestamp) / 60000);
-    return `hace ${mins}m`;
+    return mins < 1 ? 'ahora' : `hace ${mins}m`;
   };
 
   if (!mounted) return null;
@@ -82,9 +89,9 @@ export default function KdsContainer() {
           <Badge className="bg-white/20 text-white border-none text-lg px-4 py-1">
             Activos: {tickets.length}
           </Badge>
-          <div className="text-right">
+          <div className="text-right hidden md:block">
             <div className="font-bold text-lg">Estación Principal</div>
-            <div className="text-xs opacity-70">Sincronizado con Firestore</div>
+            <div className="text-xs opacity-70">Sincronizado en tiempo real</div>
           </div>
         </div>
       </header>
@@ -103,37 +110,47 @@ export default function KdsContainer() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {tickets.map((ticket) => (
-              <Card key={ticket.id} className={`overflow-hidden border-2 flex flex-col h-[400px] ${ticket.status === 'new' ? 'border-primary shadow-lg animate-pulse' : 'border-border'}`}>
+              <Card key={ticket.id} className={`overflow-hidden border-2 flex flex-col h-[400px] shadow-sm ${ticket.status === 'new' ? 'border-primary animate-pulse' : 'border-border'}`}>
                 <CardHeader className={`${STATUS_CONFIG[ticket.status].color} py-3 px-4 flex-row justify-between items-center space-y-0`}>
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      {ticket.orderId}
+                      #{ticket.orderId.split('-')[1] || ticket.orderId}
                     </CardTitle>
-                    <p className="text-xs font-semibold opacity-80 uppercase tracking-wider">Ticket: {ticket.id?.substring(0, 6)}</p>
+                    <p className="text-[10px] font-semibold opacity-80 uppercase tracking-wider">{ticket.serviceType}</p>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-bold flex items-center gap-1 justify-end">
                       <Clock className="h-3 w-3" /> {getElapsedTime(ticket.timestamp)}
                     </div>
-                    <div className="flex items-center gap-1 mt-1 font-bold">
-                      {STATUS_CONFIG[ticket.status].icon}
-                      <span className="text-xs">{STATUS_CONFIG[ticket.status].label}</span>
-                    </div>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1 p-4 space-y-4">
-                  <ul className="space-y-3">
-                    {ticket.items.map((item, idx) => (
-                      <li key={idx} className="flex justify-between items-start border-b pb-2">
-                        <div className="flex items-center gap-3">
-                          <span className="bg-secondary text-primary font-black px-2 rounded-md text-lg">
-                            {item.quantity}
-                          </span>
-                          <span className="font-bold text-lg">{item.name}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                <CardContent className="flex-1 p-4 overflow-hidden">
+                  <ScrollArea className="h-full pr-2">
+                    <ul className="space-y-3">
+                      {ticket.items.map((item, idx) => (
+                        <li key={idx} className="border-b pb-2 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <span className="bg-secondary text-primary font-black px-2 rounded-md text-lg">
+                              {item.quantity}
+                            </span>
+                            <span className="font-bold text-lg leading-tight">{item.name}</span>
+                          </div>
+                          {item.modifiers && item.modifiers.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 ml-10">
+                              {item.modifiers.map((m, mIdx) => (
+                                <Badge key={mIdx} variant="outline" className="text-[10px] border-primary/30">+ {m}</Badge>
+                              ))}
+                            </div>
+                          )}
+                          {item.notes && (
+                            <p className="text-xs italic text-muted-foreground mt-1 ml-10 bg-muted p-1 rounded">
+                              "{item.notes}"
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
                 </CardContent>
                 <CardFooter className="p-4 bg-muted/30 grid grid-cols-1 gap-2 mt-auto">
                   {ticket.status === 'new' && (

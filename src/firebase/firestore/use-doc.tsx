@@ -25,14 +25,16 @@ export function useDoc<T = DocumentData>(docRef: DocumentReference<T> | null) {
     const unsubscribe = onSnapshot(
       docRef,
       (snapshot: DocumentSnapshot<T>) => {
-        setData(snapshot.exists() ? { ...snapshot.data(), id: snapshot.id } : null);
+        setData(snapshot.exists() ? { ...snapshot.data(), id: snapshot.id } as T : null);
         setLoading(false);
       },
       async (err) => {
+        console.error("Firestore useDoc Error:", err);
         const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'get',
         });
+        permissionError.message = err.message;
         errorEmitter.emit('permission-error', permissionError);
         setError(err);
         setLoading(false);
