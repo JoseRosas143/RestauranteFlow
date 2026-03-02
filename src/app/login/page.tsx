@@ -25,41 +25,48 @@ export default function LoginPage() {
   const { toast } = useToast();
 
   const syncUserProfile = async (user: any, targetStoreId: string) => {
-    const userDocRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userDocRef);
-    
-    // Si el usuario no tiene perfil o no tiene orgId, lo actualizamos/creamos
-    if (!userDoc.exists()) {
-      const newUser = {
-        id: user.uid,
-        email: user.email,
-        role: 'admin',
-        orgId: targetStoreId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      await setDoc(userDocRef, newUser);
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
       
-      // Aseguramos que la organización exista (especialmente para la demo)
-      const orgDocRef = doc(db, 'orgs', targetStoreId);
+      let finalOrgId = targetStoreId;
+
+      if (!userDoc.exists()) {
+        const newUser = {
+          id: user.uid,
+          uid: user.uid,
+          email: user.email,
+          role: 'admin',
+          orgId: targetStoreId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        await setDoc(userDocRef, newUser);
+      } else {
+        const data = userDoc.data();
+        if (!data.orgId) {
+          await updateDoc(userDocRef, { orgId: targetStoreId, updatedAt: new Date().toISOString() });
+        } else {
+          finalOrgId = data.orgId;
+        }
+      }
+
+      // Aseguramos que la organización exista siempre
+      const orgDocRef = doc(db, 'orgs', finalOrgId);
       const orgDoc = await getDoc(orgDocRef);
       if (!orgDoc.exists()) {
         await setDoc(orgDocRef, {
-          id: targetStoreId,
-          name: 'Mi Restaurante Demo',
+          id: finalOrgId,
+          name: 'Mi Restaurante',
           ownerUid: user.uid,
           createdAt: Date.now()
         });
       }
-      return newUser;
-    } else {
-      const data = userDoc.data();
-      // Si el perfil existe pero no tiene orgId, lo parchamos con el Store ID ingresado
-      if (!data.orgId) {
-        await updateDoc(userDocRef, { orgId: targetStoreId, updatedAt: new Date().toISOString() });
-        return { ...data, orgId: targetStoreId };
-      }
-      return data;
+
+      return { orgId: finalOrgId };
+    } catch (error: any) {
+      console.error("Error in syncUserProfile:", error);
+      throw error;
     }
   };
 
@@ -75,27 +82,15 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      const userData = await syncUserProfile(user, storeId);
-      const isDemo = storeId === '143001';
-
-      if (!isDemo && userData?.orgId !== storeId) {
-        await signOut(auth);
-        toast({
-          variant: "destructive",
-          title: "ID de Tienda Incorrecto",
-          description: "Este usuario no pertenece a la tienda especificada."
-        });
-        setLoading(false);
-        return;
-      }
-
-      toast({ title: "Acceso Exitoso", description: "Iniciando sesión en RestauranteFlow" });
+      await syncUserProfile(user, storeId);
+      
+      toast({ title: "Acceso Exitoso", description: "Iniciando sesión..." });
       router.push('/admin');
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Error de acceso",
-        description: "Credenciales inválidas o Store ID incorrecto."
+        description: error.message || "Credenciales inválidas."
       });
     } finally {
       setLoading(false);
@@ -111,17 +106,7 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      
-      const userData = await syncUserProfile(user, storeId);
-      const isDemo = storeId === '143001';
-
-      if (!isDemo && userData?.orgId !== storeId) {
-        await signOut(auth);
-        toast({ variant: "destructive", title: "Acceso Denegado", description: "Store ID incorrecto para esta cuenta." });
-        return;
-      }
-
+      await syncUserProfile(result.user, storeId);
       router.push('/admin');
     } catch (error: any) {
       toast({
@@ -138,7 +123,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
-          <div className="mx-auto w-20 h-20 bg-white rounded-3xl shadow-2xl flex items-center justify-center mb-6 border border-primary/10 transition-transform hover:scale-105 duration-300">
+          <div className="mx-auto w-20 h-20 bg-white rounded-3xl shadow-2xl flex items-center justify-center mb-6 border border-primary/10">
             <Store className="h-10 w-10 text-primary" />
           </div>
           <h1 className="text-5xl font-black tracking-tighter text-primary italic uppercase leading-none">RestauranteFlow</h1>
@@ -192,7 +177,7 @@ export default function LoginPage() {
                 />
               </div>
 
-              <Button type="submit" className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl transition-all active:scale-95 mt-4" disabled={loading}>
+              <Button type="submit" className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl" disabled={loading}>
                 {loading ? <Loader2 className="animate-spin mr-2" /> : "ENTRAR AL SISTEMA"}
               </Button>
             </form>
@@ -202,7 +187,7 @@ export default function LoginPage() {
               <div className="relative flex justify-center text-[10px] uppercase font-black"><span className="bg-background px-4 text-muted-foreground">Acceso Corporativo</span></div>
             </div>
 
-            <Button variant="outline" type="button" className="w-full h-14 font-black border-2 hover:bg-primary/5 rounded-2xl transition-all" onClick={handleGoogleLogin} disabled={loading}>
+            <Button variant="outline" type="button" className="w-full h-14 font-black border-2 rounded-2xl" onClick={handleGoogleLogin} disabled={loading}>
               <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />

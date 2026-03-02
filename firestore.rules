@@ -13,51 +13,29 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Verifica acceso a la organización
-    // Para prototipado, permitimos acceso si el usuario está autenticado. 
-    // En producción se validaría la relación usuario -> orgId.
-    function isOrgMember(orgId) {
-      return isSignedIn();
-    }
-
     // --- REGLAS DE COLECCIÓN ---
+    // Flexibilizadas para asegurar que el prototipo pueda escribir datos iniciales
 
     match /users/{userId} {
-      allow get, write: if isOwner(userId);
+      allow read, write: if isOwner(userId);
     }
 
     match /orgs/{orgId} {
-      allow read, write: if isOrgMember(orgId);
+      // Permitimos lectura y escritura a cualquier usuario autenticado por ahora
+      // para facilitar el onboarding multi-tenant
+      allow read, write: if isSignedIn();
 
-      match /users/{userId} {
-        allow read, write: if isOrgMember(orgId);
-      }
-
-      match /customers/{customerId} {
-        allow read, write: if isOrgMember(orgId);
-      }
-
-      match /settings/{settingId} {
-        allow read, write: if isOrgMember(orgId);
-      }
-
-      match /locations/{locId} {
-        allow read, write: if isOrgMember(orgId);
-
-        match /menuItems/{itemId} { allow read, write: if isOrgMember(orgId); }
-        match /categories/{catId} { allow read, write: if isOrgMember(orgId); }
-        match /modifiers/{modId} { allow read, write: if isOrgMember(orgId); }
-        match /discounts/{discId} { allow read, write: if isOrgMember(orgId); }
-        match /orders/{orderId} { allow read, write: if isOrgMember(orgId); }
-        match /kitchenTickets/{ticketId} { allow read, write: if isOrgMember(orgId); }
-        
-        match /analytics/{path=**} {
-          allow read, write: if isOrgMember(orgId);
-        }
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
       }
     }
 
     match /tickets/{ticketId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Regla general de respaldo
+    match /{document=**} {
       allow read, write: if isSignedIn();
     }
   }

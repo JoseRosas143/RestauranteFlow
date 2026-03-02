@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 import LocationSelector from '@/components/tenant/LocationSelector';
 import { useTenant, useUser } from '@/firebase';
-import { ShieldAlert, Loader2, Home } from 'lucide-react';
+import { ShieldAlert, Loader2, Home, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function AdminPage() {
@@ -42,12 +42,16 @@ export default function AdminPage() {
         </div>
         <div className="space-y-2">
           <h2 className="text-3xl font-black uppercase italic tracking-tighter text-primary">Perfil Incompleto</h2>
-          <p className="max-w-md mx-auto text-muted-foreground font-bold">No hemos podido encontrar una organización vinculada a tu cuenta o el sistema está terminando de procesar tu ID de Tienda.</p>
-          <p className="text-xs text-muted-foreground">UID: {user.uid}</p>
+          <p className="max-w-md mx-auto text-muted-foreground font-bold">No hemos podido encontrar una organización vinculada a tu cuenta.</p>
+          <div className="bg-muted p-4 rounded-xl text-left space-y-1 mt-4">
+             <p className="text-[10px] font-black uppercase opacity-40">Debug Info:</p>
+             <p className="text-[10px] font-mono break-all">UID: {user.uid}</p>
+             <p className="text-[10px] font-mono">Email: {user.email}</p>
+          </div>
         </div>
         <div className="flex gap-4">
            <Button onClick={() => window.location.reload()} variant="default" className="h-14 px-8 rounded-2xl font-black gap-2">
-            REINTENTAR ACCESO
+            <RefreshCw className="h-5 w-5" /> REINTENTAR ACCESO
           </Button>
           <Button onClick={() => router.push('/')} variant="outline" className="h-14 px-8 rounded-2xl font-black gap-2 border-2">
             <Home className="h-5 w-5" /> INICIO
