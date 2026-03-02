@@ -1,3 +1,4 @@
+
 export type UserRole = 'admin' | 'manager' | 'cashier' | 'kitchen';
 export type OrderStatus = 'draft' | 'open' | 'confirmed' | 'paid';
 export type TicketStatus = 'new' | 'preparing' | 'ready' | 'served';
@@ -15,13 +16,13 @@ export interface UserProfile {
   name?: string;
   email?: string;
   phone?: string;
-  pin?: string; // PIN de 4 dígitos para acceso rápido y asistencia
+  pin?: string;
 }
 
-export interface Organization {
-  id: string;
+export interface Category {
+  id?: string;
   name: string;
-  storeId: string; // El ID de 6 dígitos
+  color?: string;
 }
 
 export interface Location {
@@ -31,16 +32,10 @@ export interface Location {
   phoneNumber?: string;
   taxRate?: number;
   logo?: string;
+  ticketHeader?: string;
+  ticketFooter?: string;
   createdAt: number;
-}
-
-export interface AttendanceRecord {
-  id?: string;
-  userId: string;
-  userName: string;
-  timestamp: number;
-  type: 'in' | 'out';
-  locId: string;
+  updatedAt?: number;
 }
 
 export interface MenuItem {
@@ -58,7 +53,7 @@ export interface MenuItem {
   inventoryCount?: number;
   tpvColor?: string;
   tpvShape?: TpvShape;
-  modifiers?: string[];
+  modifiers?: string[]; // Ejemplo: ["Sin cebolla", "Extra queso"]
 }
 
 export interface OrderItem {
@@ -67,7 +62,7 @@ export interface OrderItem {
   name: string;
   quantity: number;
   priceAtOrder: number;
-  selectedModifiers: {name: string, price: number}[];
+  selectedModifiers: string[];
   notes?: string;
 }
 
@@ -87,30 +82,25 @@ export interface Order {
   tax: number;
   total: number;
   discountAmount: number;
+  discountType?: DiscountType;
   payments: Payment[];
   paidAmount: number;
   serviceType: ServiceType;
   tableNumber?: string;
-  customerId?: string;
   notes?: string;
   createdAt: number;
   locId: string;
   orgId: string;
-  staffId?: string; // Quién tomó el pedido
+  staffId?: string;
 }
 
 export interface KitchenTicket {
   id?: string;
   orderId: string;
-  firestoreOrderId?: string;
   status: TicketStatus;
   items: { name: string; quantity: number; modifiers?: string[]; notes?: string }[];
   timestamp: number;
   serviceType: ServiceType;
   tableNumber?: string;
   locId: string;
-}
-
-export interface LoyaltySettings {
-  pointsPercentage: number;
 }
