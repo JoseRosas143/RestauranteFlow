@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [storeId, setStoreId] = useState('');
+  const [storeId, setStoreId] = useState('143001'); // Valor demo por defecto
   const [loading, setLoading] = useState(false);
   const auth = useAuth();
   const db = useFirestore();
@@ -29,16 +29,21 @@ export default function LoginPage() {
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
       
-      // Forzamos que el perfil tenga el Store ID de 6 dígitos
+      const profileData = {
+        id: user.uid,
+        uid: user.uid,
+        email: user.email,
+        role: 'admin',
+        orgId: targetStoreId,
+        updatedAt: new Date().toISOString()
+      };
+
       if (!userDoc.exists()) {
         await setDoc(userDocRef, {
-          id: user.uid,
-          uid: user.uid,
-          email: user.email,
-          role: 'admin',
-          orgId: targetStoreId,
+          ...profileData,
+          firstName: user.displayName?.split(' ')[0] || 'Admin',
+          lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
         });
       } else {
         await updateDoc(userDocRef, { 
@@ -47,7 +52,7 @@ export default function LoginPage() {
         });
       }
 
-      // Aseguramos que la organización (Negocio) exista con ese ID de 6 dígitos
+      // Aseguramos que la organización exista
       const orgDocRef = doc(db, 'orgs', targetStoreId);
       const orgDoc = await getDoc(orgDocRef);
       if (!orgDoc.exists()) {
@@ -59,6 +64,9 @@ export default function LoginPage() {
         });
       }
 
+      // Guardamos en localStorage como respaldo para el provider
+      localStorage.setItem('restauranteFlow_orgId', targetStoreId);
+      
       return { orgId: targetStoreId };
     } catch (error: any) {
       console.error("Error in syncUserProfile:", error);
@@ -78,8 +86,12 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       await syncUserProfile(userCredential.user, storeId);
       
-      toast({ title: "Acceso Exitoso", description: "Cargando panel de control..." });
-      router.push('/admin');
+      toast({ title: "Acceso Exitoso", description: "Sincronizando con tu sucursal..." });
+      
+      // Damos un pequeño respiro para que Firestore propague el cambio
+      setTimeout(() => {
+        router.push('/admin');
+      }, 800);
     } catch (error: any) {
       toast({
         variant: "destructive",

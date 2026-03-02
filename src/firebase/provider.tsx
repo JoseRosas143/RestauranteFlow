@@ -71,26 +71,32 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // Escucha en tiempo real el perfil del usuario para asegurar que orgId esté presente
+        // Obtenemos el orgId del localStorage si existe (fallback rápido tras login)
+        const cachedOrgId = localStorage.getItem('restauranteFlow_orgId');
+
         const unsubscribeUser = onSnapshot(doc(firestore, 'users', firebaseUser.uid), (docSnap) => {
           if (docSnap.exists()) {
             const userData = docSnap.data();
+            const currentOrgId = userData?.orgId || cachedOrgId;
+            
             setUserState({
               user: firebaseUser,
               isUserLoading: false,
               userError: null,
-              orgId: userData?.orgId || null,
+              orgId: currentOrgId,
               allowedLocs: userData?.allowedLocIds || [],
               role: userData?.role || 'admin'
             });
+            
+            // Si el orgId cambió o se encontró, lo actualizamos en caché
+            if (currentOrgId) localStorage.setItem('restauranteFlow_orgId', currentOrgId);
           } else {
-            // Si el documento no existe todavía, mantenemos el estado pero indicamos carga
-            // Esto sucede durante los milisegundos de la creación inicial
+            // Si el documento no existe aún, pero tenemos caché, lo usamos para no bloquear
             setUserState(prev => ({ 
               ...prev, 
               user: firebaseUser, 
-              isUserLoading: false, 
-              orgId: null 
+              isUserLoading: !!cachedOrgId ? false : prev.isUserLoading, 
+              orgId: cachedOrgId 
             }));
           }
         }, (error) => {
@@ -101,6 +107,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         return () => unsubscribeUser();
       } else {
         setUserState({ user: null, isUserLoading: false, userError: null, orgId: null, allowedLocs: [], role: null });
+        localStorage.removeItem('restauranteFlow_orgId');
         setLoc(null);
       }
     });
