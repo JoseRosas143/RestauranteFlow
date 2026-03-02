@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,25 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const syncUserProfile = async (user: any, targetStoreId: string) => {
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
+    
+    if (!userDoc.exists()) {
+      // Si el usuario existe en Auth pero no en Firestore (ej. login demo), creamos el perfil básico
+      await setDoc(userDocRef, {
+        id: user.uid,
+        email: user.email,
+        role: 'admin',
+        orgId: targetStoreId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      return { orgId: targetStoreId };
+    }
+    return userDoc.data();
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeId || storeId.length !== 6) {
@@ -36,14 +55,10 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.data();
-      
-      // Permitir acceso demo 143001 si el usuario está registrado correctamente
+      const userData = await syncUserProfile(user, storeId);
       const isDemo = storeId === '143001';
-      const userOrgId = userData?.orgId;
 
-      if (!isDemo && userOrgId !== storeId) {
+      if (!isDemo && userData?.orgId !== storeId) {
         await signOut(auth);
         toast({
           variant: "destructive",
@@ -55,7 +70,7 @@ export default function LoginPage() {
       }
 
       toast({ title: "Acceso Exitoso", description: "Iniciando sesión en RestauranteFlow" });
-      router.push('/');
+      router.push('/admin');
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -78,22 +93,16 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.data();
+      const userData = await syncUserProfile(user, storeId);
+      const isDemo = storeId === '143001';
 
-      if (!userDoc.exists()) {
-        await signOut(auth);
-        toast({ variant: "destructive", title: "Cuenta no encontrada", description: "Regístrese primero para crear su tienda." });
-        return;
-      }
-
-      if (userData?.orgId !== storeId && storeId !== '143001') {
+      if (!isDemo && userData?.orgId !== storeId) {
         await signOut(auth);
         toast({ variant: "destructive", title: "Acceso Denegado", description: "Store ID incorrecto para esta cuenta." });
         return;
       }
 
-      router.push('/');
+      router.push('/admin');
     } catch (error: any) {
       toast({
         variant: "destructive",

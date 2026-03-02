@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, getDoc } from 'firebase/firestore';
+import { Firestore, doc, onSnapshot } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
@@ -68,12 +69,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   useEffect(() => {
     if (!auth) return;
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        try {
-          const userDoc = await getDoc(doc(firestore, 'users', firebaseUser.uid));
-          const userData = userDoc.data();
-          
+        // Usamos onSnapshot para el perfil del usuario para asegurar sincronización instantánea
+        const unsubscribeUser = onSnapshot(doc(firestore, 'users', firebaseUser.uid), (docSnap) => {
+          const userData = docSnap.data();
           setUserState({
             user: firebaseUser,
             isUserLoading: false,
@@ -82,15 +82,19 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             allowedLocs: userData?.allowedLocIds || [],
             role: userData?.role || 'user'
           });
-        } catch (e) {
+        }, (error) => {
+          console.error("Error fetching user profile:", error);
           setUserState(prev => ({ ...prev, user: firebaseUser, isUserLoading: false }));
-        }
+        });
+
+        return () => unsubscribeUser();
       } else {
         setUserState({ user: null, isUserLoading: false, userError: null, orgId: null, allowedLocs: [], role: null });
         setLoc(null);
       }
     });
-    return () => unsubscribe();
+
+    return () => unsubscribeAuth();
   }, [auth, firestore]);
 
   const contextValue = useMemo(() => ({
