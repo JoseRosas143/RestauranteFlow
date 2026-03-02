@@ -92,14 +92,16 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-3">
              {currentLocationData?.logo && <img src={currentLocationData.logo} className="h-10 w-10 rounded-md object-cover" alt="Logo" />}
              <div>
-                <h1 className="text-3xl font-bold text-primary">RestauranteFlow Admin</h1>
-                <p className="text-muted-foreground">{currentLocationData?.name || 'Sucursal'} • Gestión de Catálogo</p>
+                <h1 className="text-3xl font-bold text-primary italic uppercase tracking-tighter">RestauranteFlow</h1>
+                <p className="text-muted-foreground">{currentLocationData?.name || 'Sucursal'} • Panel de Control</p>
              </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setLoc(null)} className="gap-2">
-          <Store className="h-4 w-4" /> Cambiar Sucursal
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLoc(null)} className="gap-2 font-bold">
+            <Store className="h-4 w-4" /> CAMBIAR SUCURSAL
+          </Button>
+        </div>
       </header>
 
       <main className="flex-1 p-8">
@@ -417,7 +419,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
           <div className="mb-4 space-y-4">
             <div className="p-3 bg-primary/5 rounded-xl border border-primary/20 space-y-2">
               <div className="flex items-center gap-2 font-bold text-xs uppercase text-primary">
-                <Settings className="h-3 w-3" /> Puntos
+                <Settings className="h-3 w-3" /> Configuración de Puntos
               </div>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -432,6 +434,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
                 </div>
                 <Button size="sm" onClick={saveLoyaltySettings}>Set</Button>
               </div>
+              <p className="text-[10px] text-muted-foreground italic">Porcentaje de la venta que el cliente acumula en puntos.</p>
             </div>
           </div>
           <ScrollArea className="h-[500px]">
@@ -622,7 +625,11 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
     setLoading(true);
     try {
       const { id, ...dataToSave } = locForm;
-      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), dataToSave);
+      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), {
+        ...dataToSave,
+        taxRate: Number(dataToSave.taxRate || 0),
+        updatedAt: Date.now()
+      });
       toast({ title: "Sucursal Actualizada" });
     } catch (e) {
       toast({ variant: 'destructive', title: "Error al guardar" });
@@ -658,12 +665,17 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
   };
 
   const addUser = async () => {
-    if (!newUser.name) return;
+    if (!newUser.name || !newUser.email) {
+      toast({ variant: 'destructive', title: "Nombre y Email son requeridos" });
+      return;
+    }
     try {
       await addDoc(collection(db, 'orgs', orgId, 'users'), { 
         ...newUser, 
+        uid: `USER-${Date.now()}`,
         orgId, 
-        allowedLocIds: [locId] 
+        allowedLocIds: [locId],
+        createdAt: Date.now()
       });
       toast({ title: "Usuario Creado" });
       setNewUser({ role: 'cashier', allowedLocIds: [locId] });
@@ -675,7 +687,7 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Store className="h-5 w-5" /> Sucursal</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Store className="h-5 w-5" /> Configuración de Tienda</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-xl bg-muted border-2 border-dashed flex items-center justify-center overflow-hidden relative">
@@ -688,39 +700,60 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
             <Button variant="outline" onClick={() => document.getElementById('logo-up')?.click()}><Upload className="mr-2 h-4 w-4" /> Logo</Button>
             <input id="logo-up" type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
           </div>
-          <div className="space-y-2"><Label>Nombre</Label><Input value={locForm.name} onChange={e => setLocForm({...locForm, name: e.target.value})} /></div>
-          <div className="space-y-2"><Label>Dirección</Label><Input value={locForm.address} onChange={e => setLocForm({...locForm, address: e.target.value})} /></div>
-          <Button className="w-full" onClick={saveLocationDetails} disabled={loading}>Guardar</Button>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Nombre del Negocio</Label><Input value={locForm.name} onChange={e => setLocForm({...locForm, name: e.target.value})} /></div>
+            <div className="space-y-2"><Label>WhatsApp / Teléfono</Label><Input value={locForm.phoneNumber} onChange={e => setLocForm({...locForm, phoneNumber: e.target.value})} /></div>
+          </div>
+          <div className="space-y-2"><Label>Dirección Física</Label><Input value={locForm.address} onChange={e => setLocForm({...locForm, address: e.target.value})} /></div>
+          <div className="grid grid-cols-2 gap-4">
+             <div className="space-y-2">
+               <Label>Impuesto (%)</Label>
+               <div className="relative">
+                 <Input type="number" value={locForm.taxRate} onChange={e => setLocForm({...locForm, taxRate: Number(e.target.value)})} className="pr-8" />
+                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">%</span>
+               </div>
+             </div>
+          </div>
+          <Button className="w-full font-bold" onClick={saveLocationDetails} disabled={loading}>GUARDAR CAMBIOS</Button>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5" /> Staff</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5" /> Gestión de Staff</CardTitle></CardHeader>
         <CardContent className="space-y-6">
           <div className="p-4 border rounded-xl bg-muted/20 space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Nombre" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
+            <div className="space-y-2">
+              <Input placeholder="Nombre del empleado" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
+              <Input type="email" placeholder="Correo corporativo" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
               <Select value={newUser.role} onValueChange={(v: UserRole) => setNewUser({...newUser, role: v})}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Seleccionar Rol" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="manager">Gerente</SelectItem>
                   <SelectItem value="cashier">Cajero</SelectItem>
-                  <SelectItem value="kitchen">Cocina</SelectItem>
+                  <SelectItem value="kitchen">Cocinero</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" className="w-full" onClick={addUser}>Añadir</Button>
+            <Button variant="outline" className="w-full font-bold" onClick={addUser}>AÑADIR EMPLEADO</Button>
           </div>
           <ScrollArea className="h-[200px]">
             <div className="space-y-2">
               {staff.map(u => (
-                <div key={u.uid} className="flex justify-between items-center p-3 border rounded-lg">
-                  <div>
-                    <div className="font-bold text-sm">{u.name}</div>
-                    <div className="text-[10px] uppercase">{u.role}</div>
+                <div key={u.id} className="flex justify-between items-center p-3 border rounded-lg bg-white shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                      {u.name?.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm">{u.name}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                        <Badge variant="outline" className="text-[9px] py-0">{u.role}</Badge>
+                        <span>{u.email}</span>
+                      </div>
+                    </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.uid))}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.id!))}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               ))}
             </div>
@@ -728,10 +761,11 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
         </CardContent>
       </Card>
 
-      <Card className="border-destructive/20 bg-destructive/5">
-        <CardHeader><CardTitle className="text-destructive">Peligro</CardTitle></CardHeader>
-        <CardContent>
-          <Button variant="destructive" className="w-full" onClick={resetAnalytics} disabled={loading}><RefreshCw className="mr-2 h-4 w-4" /> Resetear Analíticas</Button>
+      <Card className="border-destructive/20 bg-destructive/5 lg:col-span-2">
+        <CardHeader><CardTitle className="text-destructive flex items-center gap-2"><Settings className="h-5 w-5" /> Zona de Peligro</CardTitle></CardHeader>
+        <CardContent className="flex flex-col md:flex-row gap-4">
+          <Button variant="destructive" className="flex-1" onClick={resetAnalytics} disabled={loading}><RefreshCw className="mr-2 h-4 w-4" /> Resetear Analíticas de la Sucursal</Button>
+          <Button variant="outline" className="flex-1 text-destructive border-destructive/20 hover:bg-destructive/10">Eliminar Esta Sucursal</Button>
         </CardContent>
       </Card>
     </div>

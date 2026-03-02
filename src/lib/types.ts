@@ -7,12 +7,14 @@ export type TpvShape = 'cuadrado' | 'circulo' | 'hexágono';
 export type ServiceType = 'mesa' | 'llevar' | 'domicilio' | 'rappi' | 'ubereats' | 'didifood';
 
 export interface UserProfile {
+  id?: string;
   uid: string;
   role: UserRole;
   orgId: string;
   allowedLocIds: string[];
   name?: string;
   email?: string;
+  phone?: string;
 }
 
 export interface Organization {
@@ -24,7 +26,10 @@ export interface Location {
   id: string;
   name: string;
   address?: string;
+  phoneNumber?: string;
+  taxRate?: number;
   logo?: string;
+  createdAt: number;
 }
 
 export interface ModifierOption {
