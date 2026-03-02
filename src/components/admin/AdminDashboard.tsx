@@ -197,7 +197,7 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
       const { id, ...itemData } = newItem;
       const cleanData = {
         ...itemData,
-        price: Number(itemData.price),
+        price: Number(itemData.price || 0),
         cost: Number(itemData.cost || 0),
         inventoryCount: itemData.trackInventory ? Number(itemData.inventoryCount || 0) : 0,
         updatedAt: Date.now()
@@ -225,7 +225,10 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
   };
 
   const startEdit = (item: MenuItem) => {
-    setNewItem(item);
+    setNewItem({
+      ...initialItemState,
+      ...item
+    });
     setEditingId(item.id!);
   };
 
@@ -239,7 +242,7 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Nombre</Label>
-            <Input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
+            <Input value={newItem.name || ''} onChange={e => setNewItem({...newItem, name: e.target.value})} />
           </div>
           
           <div className="space-y-2">
@@ -261,14 +264,14 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Categoría</Label>
-              <Select onValueChange={v => setNewItem({...newItem, category: v})} value={newItem.category}>
+              <Select onValueChange={v => setNewItem({...newItem, category: v})} value={newItem.category || ''}>
                 <SelectTrigger><SelectValue placeholder="Cat" /></SelectTrigger>
                 <SelectContent>{categories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Vendido por</Label>
-              <Select onValueChange={(v: SoldBy) => setNewItem({...newItem, soldBy: v})} value={newItem.soldBy}>
+              <Select onValueChange={(v: SoldBy) => setNewItem({...newItem, soldBy: v})} value={newItem.soldBy || 'unidad'}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="unidad">Unidad</SelectItem><SelectItem value="peso">Peso</SelectItem></SelectContent>
               </Select>
@@ -277,28 +280,28 @@ function ArticulosManager({ items, categories, orgId, locId }: { items: MenuItem
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Precio ($)</Label>
-              <Input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} />
+              <Input type="number" value={newItem.price ?? ''} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} />
             </div>
             <div className="space-y-2">
               <Label>Coste ($)</Label>
-              <Input type="number" value={newItem.cost} onChange={e => setNewItem({...newItem, cost: Number(e.target.value)})} />
+              <Input type="number" value={newItem.cost ?? ''} onChange={e => setNewItem({...newItem, cost: Number(e.target.value)})} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Referencia</Label>
-              <Input value={newItem.reference} onChange={e => setNewItem({...newItem, reference: e.target.value})} />
+              <Input value={newItem.reference || ''} onChange={e => setNewItem({...newItem, reference: e.target.value})} />
             </div>
             <div className="space-y-2">
               <Label>EAN/Barra</Label>
-              <Input value={newItem.barcode} onChange={e => setNewItem({...newItem, barcode: e.target.value})} />
+              <Input value={newItem.barcode || ''} onChange={e => setNewItem({...newItem, barcode: e.target.value})} />
             </div>
           </div>
           <div className="flex items-center justify-between p-3 border rounded-lg">
             <Label>Inventario</Label>
-            <Switch checked={newItem.trackInventory} onCheckedChange={v => setNewItem({...newItem, trackInventory: v})} />
+            <Switch checked={newItem.trackInventory || false} onCheckedChange={v => setNewItem({...newItem, trackInventory: v})} />
           </div>
-          {newItem.trackInventory && <Input type="number" placeholder="Stock disponible" value={newItem.inventoryCount} onChange={e => setNewItem({...newItem, inventoryCount: Number(e.target.value)})} />}
+          {newItem.trackInventory && <Input type="number" placeholder="Stock disponible" value={newItem.inventoryCount ?? ''} onChange={e => setNewItem({...newItem, inventoryCount: Number(e.target.value)})} />}
           
           <Button className="w-full h-12 font-bold" onClick={saveItem} disabled={loading}>
             {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -425,7 +428,7 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
                 <div className="flex-1 relative">
                   <Input 
                     type="number" 
-                    value={newPercentage} 
+                    value={newPercentage || ''} 
                     onChange={e => setNewPercentage(e.target.value)} 
                     placeholder="%"
                     className="pr-8"
@@ -509,14 +512,14 @@ function ClientesManager({ customers, orgId }: { customers: Customer[], orgId: s
           <div className="p-8 space-y-6">
             <h2 className="text-2xl font-bold">{isEditing ? 'Editar Cliente' : 'Nuevo Registro'}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2"><Label className="text-zinc-400">Nombre Completo *</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} /></div>
-              <div className="space-y-2"><Label className="text-zinc-400">WhatsApp *</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} /></div>
-              <div className="space-y-2"><Label className="text-zinc-400">Email</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} /></div>
-              <div className="space-y-2"><Label className="text-zinc-400">Cumpleaños</Label><Input type="date" className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.birthday} onChange={e => setCustomerForm({...customerForm, birthday: e.target.value})} /></div>
+              <div className="space-y-2"><Label className="text-zinc-400">Nombre Completo *</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.name || ''} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} /></div>
+              <div className="space-y-2"><Label className="text-zinc-400">WhatsApp *</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.phone || ''} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} /></div>
+              <div className="space-y-2"><Label className="text-zinc-400">Email</Label><Input className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.email || ''} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} /></div>
+              <div className="space-y-2"><Label className="text-zinc-400">Cumpleaños</Label><Input type="date" className="bg-zinc-800 border-zinc-700 text-white" value={customerForm.birthday || ''} onChange={e => setCustomerForm({...customerForm, birthday: e.target.value})} /></div>
             </div>
             <div className="space-y-4 pt-4">
-               <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsMarketing} onCheckedChange={v => setCustomerForm({...customerForm, acceptsMarketing: v})} /><Label className="text-sm text-zinc-300">Acepto recibir publicidad</Label></div>
-               <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsTerms} onCheckedChange={v => setCustomerForm({...customerForm, acceptsTerms: v})} /><Label className="text-sm text-zinc-300">Acepto términos y condiciones *</Label></div>
+               <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsMarketing || false} onCheckedChange={v => setCustomerForm({...customerForm, acceptsMarketing: v})} /><Label className="text-sm text-zinc-300">Acepto recibir publicidad</Label></div>
+               <div className="flex items-center space-x-2"><Switch checked={customerForm.acceptsTerms || false} onCheckedChange={v => setCustomerForm({...customerForm, acceptsTerms: v})} /><Label className="text-sm text-zinc-300">Acepto términos y condiciones *</Label></div>
             </div>
             <Button className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black" onClick={handleSaveCustomer} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />}{isEditing ? 'ACTUALIZAR' : 'REGISTRAR'}</Button>
           </div>
@@ -534,8 +537,8 @@ function CategoriasManager({ categories, orgId, locId }: { categories: Category[
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       <Card><CardHeader><CardTitle>Nueva Categoría</CardTitle></CardHeader>
       <CardContent className="space-y-4">
-        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre" />
-        <Input type="color" value={color} onChange={e => setColor(e.target.value)} className="h-12" />
+        <Input value={name || ''} onChange={e => setName(e.target.value)} placeholder="Nombre" />
+        <Input type="color" value={color || '#B8732E'} onChange={e => setColor(e.target.value)} className="h-12" />
         <Button className="w-full" onClick={() => addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), { name, color })}><Plus className="mr-2 h-4 w-4" /> Crear</Button>
       </CardContent></Card>
       <div className="grid grid-cols-2 gap-4">{categories.map(c => (
@@ -561,11 +564,11 @@ function ModificadoresManager({ modifiers, orgId, locId }: { modifiers: Modifier
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       <Card><CardHeader><CardTitle>Nuevo Modificador</CardTitle></CardHeader>
       <CardContent className="space-y-4">
-        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Grupo (ej: Toppings)" />
+        <Input value={name || ''} onChange={e => setName(e.target.value)} placeholder="Grupo (ej: Toppings)" />
         {options.map((opt, i) => (
           <div key={i} className="flex gap-2">
-            <Input placeholder="Opción" value={opt.name} onChange={e => {const n = [...options]; n[i].name = e.target.value; setOptions(n);}} />
-            <Input type="number" placeholder="$" className="w-20" value={opt.price} onChange={e => {const n = [...options]; n[i].price = Number(e.target.value); setOptions(n);}} />
+            <Input placeholder="Opción" value={opt.name || ''} onChange={e => {const n = [...options]; n[i].name = e.target.value; setOptions(n);}} />
+            <Input type="number" placeholder="$" className="w-20" value={opt.price ?? ''} onChange={e => {const n = [...options]; n[i].price = Number(e.target.value); setOptions(n);}} />
           </div>
         ))}
         <Button variant="outline" className="w-full" onClick={() => setOptions([...options, {name: '', price: 0}])}><Plus className="h-4 w-4" /> Añadir Opción</Button>
@@ -590,10 +593,10 @@ function DescuentosManager({ discounts, orgId, locId }: { discounts: Discount[],
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       <Card><CardHeader><CardTitle>Nueva Regla</CardTitle></CardHeader>
       <CardContent className="space-y-4">
-        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre Promo" />
+        <Input value={name || ''} onChange={e => setName(e.target.value)} placeholder="Nombre Promo" />
         <div className="flex gap-2">
-          <Input type="number" value={value} onChange={e => setValue(Number(e.target.value))} className="flex-1" />
-          <Select value={type} onValueChange={(v: DiscountType) => setType(v)}>
+          <Input type="number" value={value ?? ''} onChange={e => setValue(Number(e.target.value))} className="flex-1" />
+          <Select value={type || 'porcentaje'} onValueChange={(v: DiscountType) => setType(v)}>
             <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="porcentaje">%</SelectItem><SelectItem value="monto">$ Cash</SelectItem></SelectContent>
           </Select>
@@ -613,12 +616,21 @@ function DescuentosManager({ discounts, orgId, locId }: { discounts: Discount[],
 function ConfigManager({ location, staff, orgId, locId }: { location?: Location, staff: UserProfile[], orgId: string, locId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
-  const [locForm, setLocForm] = useState<Partial<Location>>(location || {});
+  const [locForm, setLocForm] = useState<Partial<Location>>(location || { name: '', address: '', phoneNumber: '', taxRate: 0, logo: '' });
   const [loading, setLoading] = useState(false);
-  const [newUser, setNewUser] = useState<Partial<UserProfile>>({ role: 'cashier', allowedLocIds: [locId] });
+  const [newUser, setNewUser] = useState<Partial<UserProfile>>({ name: '', email: '', role: 'cashier', allowedLocIds: [locId] });
 
   useEffect(() => {
-    if (location) setLocForm(location);
+    if (location) {
+      setLocForm({
+        ...location,
+        name: location.name || '',
+        address: location.address || '',
+        phoneNumber: location.phoneNumber || '',
+        taxRate: location.taxRate || 0,
+        logo: location.logo || ''
+      });
+    }
   }, [location]);
 
   const saveLocationDetails = async () => {
@@ -678,7 +690,7 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
         createdAt: Date.now()
       });
       toast({ title: "Usuario Creado" });
-      setNewUser({ role: 'cashier', allowedLocIds: [locId] });
+      setNewUser({ name: '', email: '', role: 'cashier', allowedLocIds: [locId] });
     } catch (e) {
       toast({ variant: 'destructive', title: "Error" });
     }
@@ -701,15 +713,15 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
             <input id="logo-up" type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>Nombre del Negocio</Label><Input value={locForm.name} onChange={e => setLocForm({...locForm, name: e.target.value})} /></div>
-            <div className="space-y-2"><Label>WhatsApp / Teléfono</Label><Input value={locForm.phoneNumber} onChange={e => setLocForm({...locForm, phoneNumber: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Nombre del Negocio</Label><Input value={locForm.name || ''} onChange={e => setLocForm({...locForm, name: e.target.value})} /></div>
+            <div className="space-y-2"><Label>WhatsApp / Teléfono</Label><Input value={locForm.phoneNumber || ''} onChange={e => setLocForm({...locForm, phoneNumber: e.target.value})} /></div>
           </div>
-          <div className="space-y-2"><Label>Dirección Física</Label><Input value={locForm.address} onChange={e => setLocForm({...locForm, address: e.target.value})} /></div>
+          <div className="space-y-2"><Label>Dirección Física</Label><Input value={locForm.address || ''} onChange={e => setLocForm({...locForm, address: e.target.value})} /></div>
           <div className="grid grid-cols-2 gap-4">
              <div className="space-y-2">
                <Label>Impuesto (%)</Label>
                <div className="relative">
-                 <Input type="number" value={locForm.taxRate} onChange={e => setLocForm({...locForm, taxRate: Number(e.target.value)})} className="pr-8" />
+                 <Input type="number" value={locForm.taxRate ?? ''} onChange={e => setLocForm({...locForm, taxRate: Number(e.target.value)})} className="pr-8" />
                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">%</span>
                </div>
              </div>
@@ -723,9 +735,9 @@ function ConfigManager({ location, staff, orgId, locId }: { location?: Location,
         <CardContent className="space-y-6">
           <div className="p-4 border rounded-xl bg-muted/20 space-y-4">
             <div className="space-y-2">
-              <Input placeholder="Nombre del empleado" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
-              <Input type="email" placeholder="Correo corporativo" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
-              <Select value={newUser.role} onValueChange={(v: UserRole) => setNewUser({...newUser, role: v})}>
+              <Input placeholder="Nombre del empleado" value={newUser.name || ''} onChange={e => setNewUser({...newUser, name: e.target.value})} />
+              <Input type="email" placeholder="Correo corporativo" value={newUser.email || ''} onChange={e => setNewUser({...newUser, email: e.target.value})} />
+              <Select value={newUser.role || 'cashier'} onValueChange={(v: UserRole) => setNewUser({...newUser, role: v})}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar Rol" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Administrador</SelectItem>
