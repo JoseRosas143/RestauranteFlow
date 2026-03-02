@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useFirestore, useCollection, useDoc, useTenant } from '@/firebase';
+import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, setDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { 
   Plus, Trash2, Package, Tag, Layers, Percent, Loader2, Save, Edit2, 
@@ -28,12 +28,12 @@ export default function AdminDashboard() {
   const { orgId, locId, setLoc } = useTenant();
 
   // Queries segmentadas por Multi-Tenant
-  const menuPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'menuItems') : null, [db, orgId, locId]);
-  const categoriesPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'categories') : null, [db, orgId, locId]);
-  const modifiersPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, [db, orgId, locId]);
-  const discountsPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'discounts') : null, [db, orgId, locId]);
-  const customersPath = useMemo(() => orgId ? collection(db, 'orgs', orgId, 'customers') : null, [db, orgId]);
-  const usersPath = useMemo(() => orgId ? collection(db, 'orgs', orgId, 'users') : null, [db, orgId]);
+  const menuPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'menuItems') : null, [db, orgId, locId]);
+  const categoriesPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'categories') : null, [db, orgId, locId]);
+  const modifiersPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, [db, orgId, locId]);
+  const discountsPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'discounts') : null, [db, orgId, locId]);
+  const customersPath = useMemoFirebase(() => orgId ? collection(db, 'orgs', orgId, 'customers') : null, [db, orgId]);
+  const usersPath = useMemoFirebase(() => orgId ? collection(db, 'orgs', orgId, 'users') : null, [db, orgId]);
   const locationDocRef = useMemo(() => orgId && locId ? doc(db, 'orgs', orgId, 'locations', locId) : null, [db, orgId, locId]);
 
   const { data: items } = useCollection<MenuItem>(menuPath ? query(menuPath, orderBy('name', 'asc')) : null);
@@ -87,29 +87,29 @@ export default function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="articulos">
-            <ArticulosManager items={items} categories={categories} orgId={orgId!} locId={locId!} />
+            <ArticulosManager items={items || []} categories={categories || []} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="categorias">
-            <CategoriasManager categories={categories} orgId={orgId!} locId={locId!} />
+            <CategoriasManager categories={categories || []} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="modificadores">
-            <ModificadoresManager modifiers={modifiers} orgId={orgId!} locId={locId!} />
+            <ModificadoresManager modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="descuentos">
-            <DescuentosManager discounts={discounts} orgId={orgId!} locId={locId!} />
+            <DescuentosManager discounts={discounts || []} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="clientes">
-            <ClientesManager customers={customers} orgId={orgId!} />
+            <ClientesManager customers={customers || []} orgId={orgId!} />
           </TabsContent>
 
           <TabsContent value="config">
             <ConfigManager 
-              location={currentLocationData} 
-              staff={staffUsers} 
+              location={currentLocationData || undefined} 
+              staff={staffUsers || []} 
               orgId={orgId!} 
               locId={locId!} 
             />

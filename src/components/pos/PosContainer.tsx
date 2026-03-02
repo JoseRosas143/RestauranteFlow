@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -18,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
-import { useFirestore, useCollection, useDoc, useTenant } from '@/firebase';
+import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase } from '@/firebase';
 import { collection, doc, runTransaction, query, orderBy, setDoc, increment, addDoc } from 'firebase/firestore';
 import LocationSelector from '@/components/tenant/LocationSelector';
 
@@ -30,12 +29,12 @@ export default function PosContainer() {
   const router = useRouter();
   const { orgId, locId } = useTenant();
   
-  const menuPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'menuItems') : null, [db, orgId, locId]);
-  const modifiersPath = useMemo(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, [db, orgId, locId]);
-  const customersPath = useMemo(() => orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, [db, orgId]);
+  const menuPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'menuItems') : null, [db, orgId, locId]);
+  const modifiersPath = useMemoFirebase(() => orgId && locId ? collection(db, 'orgs', orgId, 'locations', locId, 'modifiers') : null, [db, orgId, locId]);
+  const customersPath = useMemoFirebase(() => orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, [db, orgId]);
   const loyaltyDocRef = useMemo(() => orgId ? doc(db, 'orgs', orgId, 'settings', 'loyalty') : null, [db, orgId]);
 
-  const { data: menuItems } = useCollection<MenuItem>(menuPath ? query(menuPath, orderBy('name', 'asc')) : null);
+  const { data: menuItems, isLoading: menuLoading } = useCollection<MenuItem>(menuPath ? query(menuPath, orderBy('name', 'asc')) : null);
   const { data: modifiersData } = useCollection<Modifier>(modifiersPath);
   const { data: customersData } = useCollection<Customer>(customersPath);
   const { data: loyaltySettings } = useDoc<LoyaltySettings>(loyaltyDocRef);
@@ -245,9 +244,13 @@ export default function PosContainer() {
               <Search className="h-20 w-20 mb-4" />
               <h2 className="text-2xl font-bold italic">Seleccione una sucursal para comenzar</h2>
             </div>
+          ) : menuLoading ? (
+            <div className="flex h-full items-center justify-center">
+              <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
+            </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
-              {menuItems.map((item) => (
+              {menuItems?.map((item) => (
                 <Card key={item.id} className="cursor-pointer hover:shadow-lg transition-all border-2 border-transparent active:border-primary overflow-hidden group" onClick={() => openModifierDialog(item)}>
                   <div className="relative h-32 w-full bg-muted">
                     {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center opacity-20"><ShoppingBag /></div>}
@@ -295,7 +298,7 @@ export default function PosContainer() {
         <DialogContent className="sm:max-w-xl">
           <DialogTitle className="text-2xl font-black">{selectedItemForMod?.name}</DialogTitle>
           <div className="p-4 space-y-4">
-             {modifiersData.map(m => (
+             {modifiersData?.map(m => (
                <div key={m.id} className="space-y-2">
                  <Label className="font-bold">{m.name}</Label>
                  <div className="flex flex-wrap gap-2">
