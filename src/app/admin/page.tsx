@@ -42,22 +42,25 @@ export default function AdminPage() {
         </div>
         <div className="space-y-2">
           <h2 className="text-3xl font-black uppercase italic tracking-tighter text-primary">Perfil Incompleto</h2>
-          <p className="max-w-md mx-auto text-muted-foreground font-bold">No hemos podido encontrar una organización vinculada a tu cuenta. Contacta a soporte o intenta registrar tu negocio de nuevo.</p>
+          <p className="max-w-md mx-auto text-muted-foreground font-bold">No hemos podido encontrar una organización vinculada a tu cuenta o el sistema está terminando de procesar tu ID de Tienda.</p>
+          <p className="text-xs text-muted-foreground">UID: {user.uid}</p>
         </div>
-        <Button onClick={() => router.push('/')} variant="outline" className="h-14 px-8 rounded-2xl font-black gap-2 border-2">
-          <Home className="h-5 w-5" /> VOLVER AL INICIO
-        </Button>
+        <div className="flex gap-4">
+           <Button onClick={() => window.location.reload()} variant="default" className="h-14 px-8 rounded-2xl font-black gap-2">
+            REINTENTAR ACCESO
+          </Button>
+          <Button onClick={() => router.push('/')} variant="outline" className="h-14 px-8 rounded-2xl font-black gap-2 border-2">
+            <Home className="h-5 w-5" /> INICIO
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* El LocationSelector aparecerá automáticamente si locId es null */}
       <LocationSelector />
-      
       {orgId && locId && <AdminDashboard />}
-      
       {orgId && !locId && (
         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center space-y-4">
           <div className="animate-bounce">

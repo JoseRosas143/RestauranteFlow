@@ -73,15 +73,21 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       if (firebaseUser) {
         // Usamos onSnapshot para el perfil del usuario para asegurar sincronización instantánea
         const unsubscribeUser = onSnapshot(doc(firestore, 'users', firebaseUser.uid), (docSnap) => {
-          const userData = docSnap.data();
-          setUserState({
-            user: firebaseUser,
-            isUserLoading: false,
-            userError: null,
-            orgId: userData?.orgId || null,
-            allowedLocs: userData?.allowedLocIds || [],
-            role: userData?.role || 'user'
-          });
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            setUserState({
+              user: firebaseUser,
+              isUserLoading: false,
+              userError: null,
+              orgId: userData?.orgId || null,
+              allowedLocs: userData?.allowedLocIds || [],
+              role: userData?.role || 'user'
+            });
+          } else {
+            // Si el documento no existe todavía, mantenemos el estado de carga brevemente
+            // o lo marcamos como perfil incompleto si ya pasó tiempo (aquí lo marcamos para el UI)
+            setUserState(prev => ({ ...prev, user: firebaseUser, isUserLoading: false, orgId: null }));
+          }
         }, (error) => {
           console.error("Error fetching user profile:", error);
           setUserState(prev => ({ ...prev, user: firebaseUser, isUserLoading: false }));
