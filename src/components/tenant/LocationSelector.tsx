@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -27,17 +26,23 @@ export default function LocationSelector() {
 
   useEffect(() => {
     async function fetchLocs() {
-      if (!orgId) return;
+      if (!orgId) {
+        setLoading(false);
+        return;
+      }
       try {
         const locsRef = collection(db, 'orgs', orgId, 'locations');
         const snap = await getDocs(locsRef);
         const allLocs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Location));
         
-        // Si no hay locId pero hay locaciones disponibles, filtramos por las permitidas
-        const filtered = allLocs.filter(l => allowedLocs.includes(l.id) || allowedLocs.length === 0);
+        // Si hay una lista de sucursales permitidas, filtramos. Si está vacía (admin), mostramos todas.
+        const filtered = allowedLocs.length > 0 
+          ? allLocs.filter(l => allowedLocs.includes(l.id))
+          : allLocs;
+          
         setLocations(filtered);
       } catch (e) {
-        console.error(e);
+        console.error('Error fetching locations:', e);
       } finally {
         setLoading(false);
       }
@@ -46,19 +51,33 @@ export default function LocationSelector() {
   }, [orgId, allowedLocs, db]);
 
   const createDefaultLocation = async () => {
-    if (!orgId) return;
+    if (!orgId) {
+      toast({ variant: 'destructive', title: "No se encontró el ID de organización" });
+      return;
+    }
     setCreating(true);
     try {
       const locsRef = collection(db, 'orgs', orgId, 'locations');
-      const docRef = await addDoc(locsRef, {
+      const newLoc = {
         name: 'Sucursal Principal',
         address: 'Dirección por configurar',
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        logo: ''
+      };
+      const docRef = await addDoc(locsRef, newLoc);
+      
+      const createdLoc = { id: docRef.id, ...newLoc } as Location;
+      setLocations(prev => [...prev, createdLoc]);
+      setLoc(createdLoc);
+      
+      toast({ title: "¡Éxito!", description: "Sucursal inicial creada correctamente." });
+    } catch (e: any) {
+      console.error('Error creating location:', e);
+      toast({ 
+        variant: 'destructive', 
+        title: "Error al crear sucursal", 
+        description: e.message || "Verifique los permisos de Firestore." 
       });
-      toast({ title: "Sucursal inicial creada" });
-      window.location.reload(); // Recargar para detectar la nueva locación
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Error al crear sucursal" });
     } finally {
       setCreating(false);
     }
@@ -95,13 +114,13 @@ export default function LocationSelector() {
           ) : locations.length === 0 ? (
             <div className="text-center py-8 space-y-4">
               <p className="text-muted-foreground">No se encontraron sucursales configuradas para su organización.</p>
-              <Button onClick={createDefaultLocation} disabled={creating} className="w-full">
+              <Button onClick={createDefaultLocation} disabled={creating} className="w-full h-12 font-bold">
                 {creating ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2 h-4 w-4" />}
                 Crear Sucursal Inicial
               </Button>
             </div>
           ) : (
-            <div className="grid gap-3">
+            <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2">
               {locations.map((loc) => (
                 <Button 
                   key={loc.id} 
