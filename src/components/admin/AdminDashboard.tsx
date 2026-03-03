@@ -13,13 +13,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase, useAuth } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, getDoc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { 
   Plus, Trash2, Package, Loader2, Edit2, 
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
   Tag, Image as ImageIcon, Receipt, ChevronRight, Save, 
-  Layers, Sliders, Percent, Barcode, Box, Eye
+  Layers, Sliders, Percent, Barcode, Box, Eye, LayoutGrid
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
@@ -111,30 +111,47 @@ export default function AdminDashboard() {
       </header>
 
       <main className="flex-1 p-8">
-        <Tabs defaultValue="articulos" className="space-y-6 max-w-7xl mx-auto">
-          <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem] overflow-x-auto no-scrollbar">
-            <TabsTrigger value="articulos" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl min-w-[120px]"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
-            <TabsTrigger value="categorias" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl min-w-[120px]"><Layers className="h-4 w-4" /> Categorías</TabsTrigger>
-            <TabsTrigger value="modificadores" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl min-w-[120px]"><Sliders className="h-4 w-4" /> Modificadores</TabsTrigger>
-            <TabsTrigger value="descuentos" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl min-w-[120px]"><Percent className="h-4 w-4" /> Descuentos</TabsTrigger>
-            <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl min-w-[120px]"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
-            <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl min-w-[120px]"><Settings className="h-4 w-4" /> Config</TabsTrigger>
+        <Tabs defaultValue="menu" className="space-y-6 max-w-7xl mx-auto">
+          <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem]">
+            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Artículos y Menú</TabsTrigger>
+            <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
+            <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Config</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="articulos">
-            <ArticulosManager items={items || []} categories={categories || []} modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
-          </TabsContent>
+          <TabsContent value="menu" className="space-y-12">
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
+                <Package className="h-6 w-6 text-primary" />
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Gestión de Artículos</h2>
+              </div>
+              <ArticulosManager items={items || []} categories={categories || []} modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
+            </section>
 
-          <TabsContent value="categorias">
-            <CategoriasManager categories={categories || []} items={items || []} orgId={orgId!} locId={locId!} />
-          </TabsContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <section className="space-y-6">
+                <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
+                  <Layers className="h-6 w-6 text-primary" />
+                  <h2 className="text-xl font-black uppercase italic tracking-tighter">Categorías</h2>
+                </div>
+                <CategoriasManager categories={categories || []} items={items || []} orgId={orgId!} locId={locId!} />
+              </section>
 
-          <TabsContent value="modificadores">
-            <ModifiersManager modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
-          </TabsContent>
+              <section className="space-y-6">
+                <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
+                  <Sliders className="h-6 w-6 text-primary" />
+                  <h2 className="text-xl font-black uppercase italic tracking-tighter">Modificadores</h2>
+                </div>
+                <ModifiersManager modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
+              </section>
+            </div>
 
-          <TabsContent value="descuentos">
-            <DiscountsManager discounts={discounts || []} orgId={orgId!} locId={locId!} />
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
+                <Percent className="h-6 w-6 text-primary" />
+                <h2 className="text-xl font-black uppercase italic tracking-tighter">Descuentos y Promociones</h2>
+              </div>
+              <DiscountsManager discounts={discounts || []} orgId={orgId!} locId={locId!} />
+            </section>
           </TabsContent>
 
           <TabsContent value="personal">
@@ -201,15 +218,15 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
       const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
       if (editingId) {
         await updateDoc(doc(colRef, editingId), cleanData);
-        toast({ title: "Artículo actualizado" });
+        toast({ title: "Artículo actualizado correctamente" });
       } else {
         await addDoc(colRef, { ...cleanData, createdAt: Date.now() });
-        toast({ title: "Artículo creado" });
+        toast({ title: "Artículo creado y guardado" });
       }
       setForm(initialState);
       setEditingId(null);
     } catch (e) { 
-      toast({ variant: 'destructive', title: "Error al guardar" }); 
+      toast({ variant: 'destructive', title: "Error al guardar en la base de datos" }); 
     } finally { 
       setLoading(false); 
     }
@@ -218,7 +235,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
   return (
     <div className="space-y-8">
       <Card className="rounded-[2rem] border-2 border-t-8 border-t-primary shadow-xl">
-        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">{editingId ? 'EDITAR ARTÍCULO' : 'NUEVO ARTÍCULO'}</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">{editingId ? 'EDITAR ARTÍCULO EXISTENTE' : 'NUEVO ARTÍCULO'}</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-4">
             <div className="space-y-1">
@@ -263,7 +280,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
                 <Input value={form.barcode || ''} onChange={e => setForm({...form, barcode: e.target.value})} className="h-12 rounded-xl" />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Referencia</Label>
+                <Label className="text-[10px] font-black uppercase">Referencia Interna</Label>
                 <Input value={form.reference || ''} onChange={e => setForm({...form, reference: e.target.value})} className="h-12 rounded-xl" />
               </div>
             </div>
@@ -278,14 +295,13 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase">Imagen del Producto</Label>
+              <Label className="text-[10px] font-black uppercase">Imagen o Icono</Label>
               <div className="flex gap-4 items-center">
                 <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
                   {form.image ? <img src={form.image} className="w-full h-full object-cover" /> : <Package className="h-6 w-6 opacity-20" />}
                 </div>
                 <div className="flex-1">
                   <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-xs rounded-xl cursor-pointer file:font-black file:uppercase file:text-[8px] file:bg-primary file:text-white file:border-0 file:rounded-md file:mr-2" />
-                  {form.image && <Button variant="ghost" size="sm" onClick={() => setForm({...form, image: ''})} className="mt-1 h-6 text-[8px] font-black uppercase text-destructive">Eliminar</Button>}
                 </div>
               </div>
             </div>
@@ -310,7 +326,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase">Modificadores Aplicables</Label>
+              <Label className="text-[10px] font-black uppercase">Modificadores</Label>
               <div className="grid grid-cols-2 gap-2 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
                 {modifiers.map(m => (
                   <div key={m.id} className="flex items-center gap-2 text-[10px] font-bold bg-muted/40 p-2 rounded-lg">
@@ -328,14 +344,14 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
               </div>
             </div>
             <Button className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl" onClick={save} disabled={loading}>
-              {loading ? <Loader2 className="animate-spin" /> : editingId ? 'ACTUALIZAR' : 'CREAR ARTÍCULO'}
+              {loading ? <Loader2 className="animate-spin" /> : editingId ? 'GUARDAR CAMBIOS' : 'AÑADIR AL MENÚ'}
             </Button>
             {editingId && <Button variant="ghost" className="w-full font-bold uppercase text-[10px]" onClick={() => {setEditingId(null); setForm(initialState);}}>Cancelar Edición</Button>}
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {items.map(item => (
           <Card key={item.id} className="rounded-2xl border-2 hover:border-primary transition-all group overflow-hidden bg-white shadow-sm">
             <div className="p-4 flex items-center gap-4">
@@ -347,11 +363,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
                 <p className="text-[9px] font-bold text-muted-foreground uppercase">{item.category}</p>
                 <div className="flex justify-between items-end mt-1">
                    <p className="font-black text-primary text-md leading-none">${item.price.toFixed(2)}</p>
-                   {item.trackInventory && (
-                     <Badge variant="outline" className={`text-[8px] font-black px-1.5 h-4 ${item.inventoryCount! <= 5 ? 'text-destructive border-destructive' : 'text-muted-foreground'}`}>
-                        STOCK: {item.inventoryCount}
-                     </Badge>
-                   )}
+                   <p className="text-[8px] font-bold opacity-40">REF: {item.reference || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -370,7 +382,6 @@ function CategoriasManager({ categories, items, orgId, locId }: { categories: Ca
   const db = useFirestore();
   const { toast } = useToast();
   const [form, setForm] = useState({ name: '', color: '#B8732E' });
-  const [viewItemsId, setViewItemsId] = useState<string | null>(null);
 
   const save = async () => {
     if (!form.name) return;
@@ -382,55 +393,36 @@ function CategoriasManager({ categories, items, orgId, locId }: { categories: Ca
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <Card className="rounded-[2rem] border-2 shadow-xl h-fit">
-        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter">NUEVA CATEGORÍA</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1">
-            <Label className="text-[10px] font-black uppercase">Nombre</Label>
-            <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="h-12 rounded-xl" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] font-black uppercase">Color de Identificación</Label>
-            <Input type="color" value={form.color} onChange={e => setForm({...form, color: e.target.value})} className="h-12 w-full cursor-pointer rounded-xl" />
-          </div>
-          <Button className="w-full h-14 font-black rounded-2xl" onClick={save}>AGREGAR CATEGORÍA</Button>
-        </CardContent>
-      </Card>
-      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {categories.map(cat => (
-          <Card key={cat.id} className="bg-white border-2 rounded-2xl overflow-hidden group shadow-sm h-fit">
-            <div className="p-4 flex items-center justify-between border-b bg-muted/10">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                <span className="font-black uppercase text-xs italic tracking-tighter">{cat.name}</span>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewItemsId(viewItemsId === cat.id ? null : cat.id!)}><Eye className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'categories', cat.id!))}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+    <Card className="rounded-[2rem] border-2 shadow-xl h-fit">
+      <CardContent className="p-6 space-y-6">
+        <div className="space-y-4 border-b pb-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black uppercase">Nombre</Label>
+              <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="h-10 rounded-xl" />
             </div>
-            {viewItemsId === cat.id && (
-              <div className="p-4 bg-muted/5 space-y-2">
-                <p className="text-[8px] font-black uppercase text-muted-foreground mb-2">Artículos en esta categoría:</p>
-                {items.filter(i => i.category === cat.name).length === 0 ? (
-                  <p className="text-[10px] font-bold text-muted-foreground italic">No hay artículos aún.</p>
-                ) : (
-                  items.filter(i => i.category === cat.name).map(i => (
-                    <div key={i.id} className="flex justify-between items-center text-[10px] font-bold py-1 border-b last:border-0">
-                      <span>{i.name}</span>
-                      <span className="text-primary">${i.price}</span>
-                    </div>
-                  ))
-                )}
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black uppercase">Color</Label>
+              <Input type="color" value={form.color} onChange={e => setForm({...form, color: e.target.value})} className="h-10 w-full cursor-pointer rounded-xl" />
+            </div>
+          </div>
+          <Button className="w-full h-12 font-black rounded-xl" onClick={save}>AÑADIR CATEGORÍA</Button>
+        </div>
+        <ScrollArea className="h-[200px]">
+          <div className="space-y-2">
+            {categories.map(cat => (
+              <div key={cat.id} className="flex justify-between items-center p-3 border-2 rounded-xl bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                  <span className="font-black uppercase text-xs italic tracking-tighter">{cat.name}</span>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'categories', cat.id!))}><Trash2 className="h-4 w-4" /></Button>
               </div>
-            )}
-          </Card>
-        ))}
-      </div>
-    </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -452,7 +444,7 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
 
   const save = async () => {
     if (!name || options.length === 0) {
-      toast({ variant: 'destructive', title: 'Datos incompletos', description: 'Nombre y al menos una opción son requeridos.' });
+      toast({ variant: 'destructive', title: 'Datos incompletos' });
       return;
     }
     setLoading(true);
@@ -462,87 +454,53 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
 
       if (editingId) {
         await updateDoc(doc(colRef, editingId), cleanData);
-        toast({ title: "Grupo de modificadores actualizado" });
+        toast({ title: "Modificador actualizado" });
       } else {
         await addDoc(colRef, { ...cleanData, createdAt: Date.now() });
-        toast({ title: "Grupo de modificadores creado" });
+        toast({ title: "Modificador creado" });
       }
-      resetForm();
-    } catch (e) { 
-      toast({ variant: 'destructive', title: "Error al guardar" }); 
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setName('');
-    setOptions([]);
-    setEditingId(null);
-    setOptName('');
-    setOptPrice(0);
-  };
-
-  const startEdit = (m: ModifierGroup) => {
-    setEditingId(m.id!);
-    setName(m.name);
-    setOptions([...m.options]);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+      setName(''); setOptions([]); setEditingId(null);
+    } catch (e) { toast({ variant: 'destructive' }); }
+    finally { setLoading(false); }
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <Card className="rounded-[2rem] border-2 shadow-xl">
-        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter">{editingId ? 'EDITAR MODIFICADOR' : 'NUEVO MODIFICADOR'}</CardTitle></CardHeader>
-        <CardContent className="space-y-6">
+    <Card className="rounded-[2rem] border-2 shadow-xl">
+      <CardContent className="p-6 space-y-6">
+        <div className="space-y-4 border-b pb-6">
           <div className="space-y-1">
-            <Label className="text-[10px] font-black uppercase">Nombre del Grupo (ej. Extras)</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} className="h-12 rounded-xl" />
+            <Label className="text-[10px] font-black uppercase">Nombre del Grupo</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} className="h-10 rounded-xl" />
           </div>
-          <div className="p-4 bg-muted/30 rounded-2xl space-y-4">
-            <p className="text-[10px] font-black uppercase text-center border-b pb-2">Agregar Opciones</p>
-            <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Opción" value={optName} onChange={e => setOptName(e.target.value)} className="h-10 rounded-xl" />
-              <Input type="number" placeholder="Precio ($)" value={optPrice || ''} onChange={e => setOptPrice(Number(e.target.value))} className="h-10 rounded-xl" />
-            </div>
-            <Button variant="secondary" className="w-full rounded-xl font-bold uppercase text-[10px]" onClick={addOption}>Vincular Opción</Button>
-            <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
-              {options.map((o, i) => (
-                <div key={i} className="flex justify-between items-center text-[10px] font-bold bg-white p-2 rounded-lg border">
-                  <span>{o.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-primary">+${o.price}</span>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => setOptions(options.filter((_, idx) => idx !== i))}><X className="h-3 w-3" /></Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Input placeholder="Opción" value={optName} onChange={e => setOptName(e.target.value)} className="h-10 rounded-xl" />
+            <Input type="number" placeholder="$" value={optPrice || ''} onChange={e => setOptPrice(Number(e.target.value))} className="h-10 rounded-xl" />
           </div>
+          <Button variant="secondary" className="w-full rounded-xl font-bold uppercase text-[10px]" onClick={addOption}>Vincular Opción</Button>
+          <div className="flex flex-wrap gap-2">
+            {options.map((o, i) => <Badge key={i} className="gap-1 px-3 h-8 rounded-lg">{o.name} (${o.price}) <X className="h-3 w-3 cursor-pointer" onClick={() => setOptions(options.filter((_, idx) => idx !== i))} /></Badge>)}
+          </div>
+          <Button className="w-full h-12 font-black rounded-xl" onClick={save} disabled={loading}>{editingId ? 'GUARDAR CAMBIOS' : 'CREAR GRUPO'}</Button>
+          {editingId && <Button variant="ghost" className="w-full text-[8px] font-black uppercase" onClick={() => {setEditingId(null); setName(''); setOptions([]);}}>Cancelar</Button>}
+        </div>
+        <ScrollArea className="h-[200px]">
           <div className="space-y-2">
-            <Button className="w-full h-14 font-black rounded-2xl" onClick={save} disabled={loading}>
-              {loading ? <Loader2 className="animate-spin" /> : editingId ? 'ACTUALIZAR GRUPO' : 'GUARDAR GRUPO'}
-            </Button>
-            {editingId && (
-              <Button variant="ghost" className="w-full font-bold uppercase text-[10px]" onClick={resetForm}>Cancelar Edición</Button>
-            )}
+            {modifiers.map(m => (
+              <div key={m.id} className="flex justify-between items-center p-3 border-2 rounded-xl bg-white group">
+                <div>
+                  <h4 className="font-black text-xs uppercase italic">{m.name}</h4>
+                  <p className="text-[8px] font-bold text-muted-foreground">{m.options.length} opciones vinculadas</p>
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setEditingId(m.id!); setName(m.name); setOptions(m.options);}}><Edit2 className="h-3 w-3" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'modifiers', m.id!))}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            ))}
           </div>
-        </CardContent>
-      </Card>
-      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {modifiers.map(m => (
-          <Card key={m.id} className="rounded-2xl border-2 p-6 flex flex-col justify-between group relative overflow-hidden bg-white shadow-sm">
-            <div className="absolute top-4 right-4 flex gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={() => startEdit(m)}><Edit2 className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" className="text-destructive h-8 w-8 hover:bg-destructive/10 rounded-full" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'modifiers', m.id!))}><Trash2 className="h-4 w-4" /></Button>
-            </div>
-            <h4 className="font-black uppercase italic text-lg mb-4 text-primary leading-none">{m.name}</h4>
-            <div className="flex flex-wrap gap-2">
-              {m.options.map((o, i) => <Badge key={i} variant="secondary" className="font-bold text-[9px] px-2 py-1">+{o.name} (${o.price})</Badge>)}
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -556,51 +514,48 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
     try {
       await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), { ...form, updatedAt: Date.now() });
       setForm({ name: '', value: 0, type: 'porcentaje' });
-      toast({ title: "Descuento configurado" });
+      toast({ title: "Descuento activado" });
     } catch (e) { toast({ variant: 'destructive' }); }
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <Card className="rounded-[2rem] border-2 shadow-xl">
-        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter">NUEVO DESCUENTO</CardTitle></CardHeader>
-        <CardContent className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden flex flex-col justify-center p-6 border-dashed border-primary/40 bg-primary/5">
+        <div className="space-y-4">
           <div className="space-y-1">
-            <Label className="text-[10px] font-black uppercase">Nombre del Descuento</Label>
-            <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="h-12 rounded-xl" />
+            <Label className="text-[10px] font-black uppercase">Nombre de Promo</Label>
+            <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="h-10 rounded-xl bg-white" />
           </div>
           <div className="grid grid-cols-2 gap-4">
              <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase">Valor</Label>
-                <Input type="number" value={form.value || ''} onChange={e => setForm({...form, value: Number(e.target.value)})} className="h-12 rounded-xl" />
+                <Input type="number" value={form.value || ''} onChange={e => setForm({...form, value: Number(e.target.value)})} className="h-10 rounded-xl bg-white" />
              </div>
              <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase">Tipo</Label>
                 <Select value={form.type} onValueChange={(v: any) => setForm({...form, type: v})}>
-                   <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
+                   <SelectTrigger className="h-10 rounded-xl bg-white"><SelectValue /></SelectTrigger>
                    <SelectContent>
-                      <SelectItem value="porcentaje">Porcentaje (%)</SelectItem>
-                      <SelectItem value="monto">Efectivo ($)</SelectItem>
+                      <SelectItem value="porcentaje">%</SelectItem>
+                      <SelectItem value="monto">$</SelectItem>
                    </SelectContent>
                 </Select>
              </div>
           </div>
-          <Button className="w-full h-14 font-black rounded-2xl" onClick={save}>ACTIVAR DESCUENTO</Button>
-        </CardContent>
+          <Button className="w-full h-12 font-black rounded-xl" onClick={save}>CREAR PROMO</Button>
+        </div>
       </Card>
-      <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
-        {discounts.map(d => (
-          <div key={d.id} className="bg-white border-2 rounded-2xl p-6 flex flex-col items-center gap-2 group relative shadow-sm">
-            <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'discounts', d.id!))}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-            <h5 className="font-black uppercase italic text-xs tracking-tighter text-muted-foreground">{d.name}</h5>
-            <div className="text-3xl font-black text-primary">
-               {d.type === 'porcentaje' ? `${d.value}%` : `$${d.value}`}
-            </div>
+      {discounts.map(d => (
+        <Card key={d.id} className="bg-white border-2 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 group relative shadow-sm h-[200px]">
+          <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'discounts', d.id!))}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <h5 className="font-black uppercase italic text-xs tracking-tighter text-muted-foreground">{d.name}</h5>
+          <div className="text-4xl font-black text-primary">
+             {d.type === 'porcentaje' ? `${d.value}%` : `$${d.value}`}
           </div>
-        ))}
-      </div>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -615,7 +570,7 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
 
   const saveStaffUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.pin) {
-      toast({ variant: 'destructive', title: 'Faltan datos', description: 'Nombre, Email y PIN son requeridos.' });
+      toast({ variant: 'destructive', title: 'Faltan datos' });
       return;
     }
     setLoading(true);
@@ -638,67 +593,59 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
       }
       setNewUser(initialStaffState);
       setEditingId(null);
-      toast({ title: "Staff actualizado correctamente" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error al guardar" }); }
+      toast({ title: "Equipo actualizado" });
+    } catch (e) { toast({ variant: 'destructive' }); }
     finally { setLoading(false); }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <Card className="border-t-8 border-t-primary shadow-xl rounded-[2rem] overflow-hidden border-2">
-        <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">{editingId ? 'EDITAR COLABORADOR' : 'ALTA DE PERSONAL'}</CardTitle></CardHeader>
+        <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">{editingId ? 'EDITAR EQUIPO' : 'ALTA DE EQUIPO'}</CardTitle></CardHeader>
         <CardContent className="space-y-6 pt-8">
            <div className="space-y-4">
               <div className="space-y-1">
-                 <Label className="text-[10px] font-black uppercase ml-1">Nombre Completo</Label>
-                 <Input placeholder="Ej: Mario Rossi" value={newUser.name || ''} onChange={e => setNewUser({...newUser, name: e.target.value})} className="h-12 rounded-xl" />
+                 <Label className="text-[10px] font-black uppercase">Nombre</Label>
+                 <Input value={newUser.name || ''} onChange={e => setNewUser({...newUser, name: e.target.value})} className="h-12 rounded-xl" />
               </div>
               <div className="space-y-1">
-                 <Label className="text-[10px] font-black uppercase ml-1">Correo Electrónico</Label>
-                 <Input placeholder="mario@tienda.com" value={newUser.email || ''} onChange={e => setNewUser({...newUser, email: e.target.value})} className="h-12 rounded-xl" />
+                 <Label className="text-[10px] font-black uppercase">Email</Label>
+                 <Input value={newUser.email || ''} onChange={e => setNewUser({...newUser, email: e.target.value})} className="h-12 rounded-xl" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase ml-1">Rol Operativo</Label>
+                    <Label className="text-[10px] font-black uppercase">Rol</Label>
                     <Select value={newUser.role} onValueChange={(v: any) => setNewUser({...newUser, role: v})}>
-                       <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Rol" /></SelectTrigger>
+                       <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
                        <SelectContent>
                           <SelectItem value="admin">Administrador</SelectItem>
-                          <SelectItem value="manager">Gerente / Encargado</SelectItem>
-                          <SelectItem value="cashier">Cajero / POS</SelectItem>
-                          <SelectItem value="kitchen">Cocinero / KDS</SelectItem>
+                          <SelectItem value="manager">Gerente</SelectItem>
+                          <SelectItem value="cashier">Cajero</SelectItem>
+                          <SelectItem value="kitchen">Cocina</SelectItem>
                        </SelectContent>
                     </Select>
                  </div>
                  <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase ml-1">PIN POS (4 dígitos)</Label>
-                    <div className="relative">
-                       <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
-                       <Input placeholder="1234" maxLength={4} value={newUser.pin || ''} onChange={e => setNewUser({...newUser, pin: e.target.value})} className="pl-10 h-12 rounded-xl font-black tracking-widest" />
-                    </div>
+                    <Label className="text-[10px] font-black uppercase">PIN POS (4 dígitos)</Label>
+                    <Input placeholder="1234" maxLength={4} value={newUser.pin || ''} onChange={e => setNewUser({...newUser, pin: e.target.value})} className="h-12 rounded-xl font-black tracking-widest text-center" />
                  </div>
               </div>
-              <Button className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl" onClick={saveStaffUser} disabled={loading}>{editingId ? 'ACTUALIZAR DATOS' : 'VINCULAR A LA SEDE'}</Button>
-              {editingId && <Button variant="ghost" className="w-full font-bold uppercase text-[10px]" onClick={() => {setEditingId(null); setNewUser(initialStaffState);}}>Cancelar</Button>}
+              <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl" onClick={saveStaffUser} disabled={loading}>GUARDAR PERSONAL</Button>
            </div>
         </CardContent>
       </Card>
 
       <Card className="rounded-[2rem] border-2 shadow-xl h-fit overflow-hidden">
-        <CardHeader className="bg-primary/5"><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">EQUIPO ACTIVO</CardTitle></CardHeader>
-        <CardContent className="pt-6">
-           <ScrollArea className="h-[450px] pr-4">
+        <CardContent className="p-6">
+           <ScrollArea className="h-[450px]">
               <div className="space-y-3">
                  {staff.map(u => (
                     <div key={u.id} className="flex justify-between items-center p-4 border-2 rounded-[1.25rem] bg-white group hover:border-primary transition-all">
                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-xl border-2 border-primary/20">{u.name?.charAt(0) || 'U'}</div>
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary border-2 border-primary/20">{u.name?.charAt(0)}</div>
                           <div>
-                             <h4 className="font-black text-lg uppercase leading-none">{u.name}</h4>
-                             <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="secondary" className="text-[9px] font-black uppercase px-2">{u.role}</Badge>
-                                <span className="text-[10px] font-bold text-muted-foreground">PIN: {u.pin || '----'}</span>
-                             </div>
+                             <h4 className="font-black text-sm uppercase leading-none">{u.name}</h4>
+                             <Badge variant="secondary" className="text-[8px] mt-1 uppercase">{u.role}</Badge>
                           </div>
                        </div>
                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -735,85 +682,47 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
     }
   }, [location]);
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm(prev => ({ ...prev, logo: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const save = async () => {
     setLoading(true);
     try {
-      const cleanData = {
-        name: form.name || '',
-        address: form.address || '',
-        phoneNumber: form.phoneNumber || '',
-        taxRate: Number(form.taxRate) || 0,
-        logo: form.logo || '',
-        ticketHeader: form.ticketHeader || '',
-        ticketFooter: form.ticketFooter || '',
-        updatedAt: Date.now()
-      };
-      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), cleanData);
-      toast({ title: "Configuración guardada correctamente" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error al guardar" }); }
+      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), { ...form, updatedAt: Date.now() });
+      toast({ title: "Configuración guardada" });
+    } catch (e) { toast({ variant: 'destructive' }); }
     finally { setLoading(false); }
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto pb-12">
-       <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden">
-          <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic text-xl">Información de la Sede</CardTitle></CardHeader>
-          <CardContent className="pt-8 space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+       <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
+          <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic text-xl">Sede Operativa</CardTitle></CardHeader>
+          <CardContent className="p-8 space-y-4">
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase ml-1">Nombre Comercial</Label>
+                <Label className="text-[10px] font-black uppercase">Nombre Comercial</Label>
                 <Input value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} className="h-12 rounded-xl" />
              </div>
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase ml-1">Dirección Física</Label>
-                <Input value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} className="h-12 rounded-xl" />
+                <Label className="text-[10px] font-black uppercase">IVA / TAX (%)</Label>
+                <Input type="number" value={form.taxRate ?? 0} onChange={e => setForm({...form, taxRate: Number(e.target.value)})} className="h-12 rounded-xl" />
              </div>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                   <Label className="text-[10px] font-black uppercase ml-1">Teléfono</Label>
-                   <Input value={form.phoneNumber || ''} onChange={e => setForm({...form, phoneNumber: e.target.value})} className="h-12 rounded-xl" />
-                </div>
-                <div className="space-y-1">
-                   <Label className="text-[10px] font-black uppercase ml-1">Impuesto (IVA/TAX %)</Label>
-                   <Input type="number" value={form.taxRate ?? 0} onChange={e => setForm({...form, taxRate: Number(e.target.value)})} className="h-12 rounded-xl" />
-                </div>
+             <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase">Teléfono</Label>
+                <Input value={form.phoneNumber || ''} onChange={e => setForm({...form, phoneNumber: e.target.value})} className="h-12 rounded-xl" />
              </div>
-             <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase ml-1">Logo de la Sucursal</Label>
-                <div className="flex gap-4 items-center">
-                   <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
-                      {form.logo ? <img src={form.logo} className="w-full h-full object-cover" /> : <Store className="h-6 w-6 opacity-20" />}
-                   </div>
-                   <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-xs rounded-xl cursor-pointer file:font-black file:uppercase file:text-[8px] file:bg-primary file:text-white file:border-0 file:rounded-md file:mr-2" />
-                </div>
-             </div>
+             <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={save} disabled={loading}>GUARDAR CAMBIOS</Button>
           </CardContent>
        </Card>
 
-       <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden">
-          <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><Receipt className="h-5 w-5" /> Configuración de Ticket</CardTitle></CardHeader>
-          <CardContent className="pt-8 space-y-4">
+       <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
+          <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic text-xl">Personalización Ticket</CardTitle></CardHeader>
+          <CardContent className="p-8 space-y-4">
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase ml-1">Mensaje Superior (Header)</Label>
-                <Textarea placeholder="Ej: ¡Bienvenido a RestauranteFlow!" value={form.ticketHeader || ''} onChange={e => setForm({...form, ticketHeader: e.target.value})} className="min-h-[100px] rounded-xl" />
+                <Label className="text-[10px] font-black uppercase">Encabezado</Label>
+                <Textarea value={form.ticketHeader || ''} onChange={e => setForm({...form, ticketHeader: e.target.value})} className="min-h-[120px] rounded-xl" />
              </div>
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase ml-1">Mensaje Inferior (Footer)</Label>
-                <Textarea placeholder="Ej: Gracias por su visita. ¡Vuelva pronto!" value={form.ticketFooter || ''} onChange={e => setForm({...form, ticketFooter: e.target.value})} className="min-h-[100px] rounded-xl" />
+                <Label className="text-[10px] font-black uppercase">Pie de Página</Label>
+                <Textarea value={form.ticketFooter || ''} onChange={e => setForm({...form, ticketFooter: e.target.value})} className="min-h-[120px] rounded-xl" />
              </div>
-             <Button className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl mt-4" onClick={save} disabled={loading}>
-                {loading ? <Loader2 className="animate-spin" /> : 'GUARDAR TODA LA CONFIGURACIÓN'}
-             </Button>
           </CardContent>
        </Card>
     </div>
