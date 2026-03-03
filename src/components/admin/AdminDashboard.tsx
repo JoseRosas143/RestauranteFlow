@@ -66,12 +66,18 @@ export default function AdminDashboard() {
     [db, orgId, locId]
   );
 
+  const locationsQuery = useMemoFirebase(() => 
+    orgId ? query(collection(db, 'orgs', orgId, 'locations'), orderBy('createdAt', 'desc')) : null, 
+    [db, orgId]
+  );
+
   const { data: items } = useCollection<MenuItem>(itemsQuery);
   const { data: categories } = useCollection<Category>(categoriesQuery);
   const { data: modifiers } = useCollection<ModifierGroup>(modifiersQuery);
   const { data: discounts } = useCollection<Discount>(discountsQuery);
   const { data: staffUsers } = useCollection<UserProfile>(usersQuery);
   const { data: currentLocationData } = useDoc<Location>(locationDocRef);
+  const { data: allLocations } = useCollection<Location>(locationsQuery);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -162,7 +168,7 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="config">
-            <ConfigManager location={currentLocationData || undefined} orgId={orgId!} locId={locId!} />
+            <ConfigManager location={currentLocationData || undefined} orgId={orgId!} locId={locId!} allLocations={allLocations || []} />
           </TabsContent>
         </Tabs>
       </main>
@@ -738,7 +744,7 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
   );
 }
 
-function ConfigManager({ location, orgId, locId }: { location?: Location, orgId: string, locId: string }) {
+function ConfigManager({ location, orgId, locId, allLocations }: { location?: Location, orgId: string, locId: string, allLocations: Location[] }) {
   const db = useFirestore();
   const { setLoc } = useTenant();
   const { toast } = useToast();
@@ -747,7 +753,6 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
     logo: '', websiteUrl: '', ticketHeader: '', ticketFooter: '' 
   });
   const [loading, setLoading] = useState(false);
-  const [allLocations, setAllLocations] = useState<Location[]>([]);
 
   useEffect(() => { 
     if (location) {
@@ -763,14 +768,7 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
         ticketFooter: location.ticketFooter || ''
       });
     }
-    fetchLocations();
-  }, [location, orgId]);
-
-  const fetchLocations = async () => {
-    if (!orgId) return;
-    const snap = await getDocs(collection(db, 'orgs', orgId, 'locations'));
-    setAllLocations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Location)));
-  };
+  }, [location]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -809,7 +807,6 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
     })
       .then(() => {
         toast({ title: "Sucursal creada" });
-        fetchLocations();
       })
       .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create' }));
@@ -827,7 +824,6 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
     deleteDoc(docRef)
       .then(() => {
         toast({ title: "Sucursal eliminada" });
-        fetchLocations();
       })
       .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
@@ -860,12 +856,16 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
                           {l.id === locId && <Badge className="bg-white text-primary text-[8px] font-black">ACTIVA</Badge>}
                         </Button>
                         {l.id !== locId && (
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center">
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
                             <Button 
                               variant="ghost" 
                               size="icon" 
                               className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-full"
-                              onClick={(e) => { e.stopPropagation(); deleteLocation(l.id, l.name); }}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                e.preventDefault();
+                                deleteLocation(l.id, l.name); 
+                              }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -895,21 +895,7 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
                    <Input type="number" value={form.cardFee ?? 0} onChange={e => setForm({...form, cardFee: Number(e.target.value)})} className="h-12 rounded-xl" />
                 </div>
              </div>
-             <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Teléfono de Contacto</Label>
-                <div className="relative">
-                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                   <Input value={form.phoneNumber || ''} onChange={e => setForm({...form, phoneNumber: e.target.value})} className="h-12 pl-12 rounded-xl" />
-                </div>
-             </div>
-             <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Dirección Física</Label>
-                <div className="relative">
-                   <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                   <Input value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} className="h-12 pl-12 rounded-xl" />
-                </div>
-             </div>
-             <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={save} disabled={loading}>GUARDAR CAMBIOS</Button>
+             <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={save} disabled={loading}>GUARDAR FINANZAS</Button>
           </CardContent>
        </Card>
 
@@ -925,6 +911,20 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
                    <div className="flex-1">
                     <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-[8px] font-black rounded-xl file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[8px] file:font-black file:bg-primary file:text-white" />
                    </div>
+                </div>
+             </div>
+             <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase">Dirección Física</Label>
+                <div className="relative">
+                   <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                   <Input value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} className="h-12 pl-12 rounded-xl" />
+                </div>
+             </div>
+             <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase">Teléfono de Contacto</Label>
+                <div className="relative">
+                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                   <Input value={form.phoneNumber || ''} onChange={e => setForm({...form, phoneNumber: e.target.value})} className="h-12 pl-12 rounded-xl" />
                 </div>
              </div>
              <div className="space-y-1">
