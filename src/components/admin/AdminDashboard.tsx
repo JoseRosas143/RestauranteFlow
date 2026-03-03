@@ -13,16 +13,16 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase, useAuth } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { 
   Plus, Trash2, Package, Loader2, Edit2, 
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
-  Tag, Image as ImageIcon, ClipboardList, Receipt, ChevronRight, Save, 
-  Layers, Sliders, Percent, Barcode, Box, Upload, Eye
+  Tag, Image as ImageIcon, Receipt, ChevronRight, Save, 
+  Layers, Sliders, Percent, Barcode, Box, Eye
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount, TpvShape } from '@/lib/types';
+import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
 export default function AdminDashboard() {
@@ -30,7 +30,7 @@ export default function AdminDashboard() {
   const db = useFirestore();
   const auth = useAuth();
   const router = useRouter();
-  const { orgId, locId, setLoc } = useTenant();
+  const { orgId, locId } = useTenant();
   const { toast } = useToast();
 
   const itemsQuery = useMemoFirebase(() => 
@@ -201,12 +201,13 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
       const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
       if (editingId) {
         await updateDoc(doc(colRef, editingId), cleanData);
+        toast({ title: "Artículo actualizado" });
       } else {
         await addDoc(colRef, { ...cleanData, createdAt: Date.now() });
+        toast({ title: "Artículo creado" });
       }
       setForm(initialState);
       setEditingId(null);
-      toast({ title: "Guardado correctamente" });
     } catch (e) { 
       toast({ variant: 'destructive', title: "Error al guardar" }); 
     } finally { 
@@ -280,7 +281,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
               <Label className="text-[10px] font-black uppercase">Imagen del Producto</Label>
               <div className="flex gap-4 items-center">
                 <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
-                  {form.image ? <img src={form.image} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
+                  {form.image ? <img src={form.image} className="w-full h-full object-cover" /> : <Package className="h-6 w-6 opacity-20" />}
                 </div>
                 <div className="flex-1">
                   <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-xs rounded-xl cursor-pointer file:font-black file:uppercase file:text-[8px] file:bg-primary file:text-white file:border-0 file:rounded-md file:mr-2" />
@@ -486,6 +487,7 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
     setEditingId(m.id!);
     setName(m.name);
     setOptions([...m.options]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
