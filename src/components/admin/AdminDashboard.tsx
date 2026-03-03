@@ -436,6 +436,8 @@ function CategoriasManager({ categories, items, orgId, locId }: { categories: Ca
 function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGroup[], orgId: string, locId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [options, setOptions] = useState<{name: string, price: number}[]>([]);
   const [optName, setOptName] = useState('');
@@ -448,18 +450,48 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
   };
 
   const save = async () => {
-    if (!name || options.length === 0) return;
+    if (!name || options.length === 0) {
+      toast({ variant: 'destructive', title: 'Datos incompletos', description: 'Nombre y al menos una opción son requeridos.' });
+      return;
+    }
+    setLoading(true);
     try {
-      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'modifiers'), { name, options, updatedAt: Date.now() });
-      setName(''); setOptions([]);
-      toast({ title: "Grupo de modificadores guardado" });
-    } catch (e) { toast({ variant: 'destructive' }); }
+      const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'modifiers');
+      const cleanData = { name, options, updatedAt: Date.now() };
+
+      if (editingId) {
+        await updateDoc(doc(colRef, editingId), cleanData);
+        toast({ title: "Grupo de modificadores actualizado" });
+      } else {
+        await addDoc(colRef, { ...cleanData, createdAt: Date.now() });
+        toast({ title: "Grupo de modificadores creado" });
+      }
+      resetForm();
+    } catch (e) { 
+      toast({ variant: 'destructive', title: "Error al guardar" }); 
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setName('');
+    setOptions([]);
+    setEditingId(null);
+    setOptName('');
+    setOptPrice(0);
+  };
+
+  const startEdit = (m: ModifierGroup) => {
+    setEditingId(m.id!);
+    setName(m.name);
+    setOptions([...m.options]);
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
       <Card className="rounded-[2rem] border-2 shadow-xl">
-        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter">NUEVO MODIFICADOR</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter">{editingId ? 'EDITAR MODIFICADOR' : 'NUEVO MODIFICADOR'}</CardTitle></CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-1">
             <Label className="text-[10px] font-black uppercase">Nombre del Grupo (ej. Extras)</Label>
@@ -484,13 +516,23 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
               ))}
             </div>
           </div>
-          <Button className="w-full h-14 font-black rounded-2xl" onClick={save}>GUARDAR GRUPO</Button>
+          <div className="space-y-2">
+            <Button className="w-full h-14 font-black rounded-2xl" onClick={save} disabled={loading}>
+              {loading ? <Loader2 className="animate-spin" /> : editingId ? 'ACTUALIZAR GRUPO' : 'GUARDAR GRUPO'}
+            </Button>
+            {editingId && (
+              <Button variant="ghost" className="w-full font-bold uppercase text-[10px]" onClick={resetForm}>Cancelar Edición</Button>
+            )}
+          </div>
         </CardContent>
       </Card>
       <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
         {modifiers.map(m => (
           <Card key={m.id} className="rounded-2xl border-2 p-6 flex flex-col justify-between group relative overflow-hidden bg-white shadow-sm">
-            <div className="absolute top-4 right-4"><Button variant="ghost" size="icon" className="text-destructive h-8 w-8 hover:bg-destructive/10" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'modifiers', m.id!))}><Trash2 className="h-4 w-4" /></Button></div>
+            <div className="absolute top-4 right-4 flex gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={() => startEdit(m)}><Edit2 className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="text-destructive h-8 w-8 hover:bg-destructive/10 rounded-full" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'modifiers', m.id!))}><Trash2 className="h-4 w-4" /></Button>
+            </div>
             <h4 className="font-black uppercase italic text-lg mb-4 text-primary leading-none">{m.name}</h4>
             <div className="flex flex-wrap gap-2">
               {m.options.map((o, i) => <Badge key={i} variant="secondary" className="font-bold text-[9px] px-2 py-1">+{o.name} (${o.price})</Badge>)}
