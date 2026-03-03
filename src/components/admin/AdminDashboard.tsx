@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,13 +13,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase, useAuth } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { 
   Plus, Trash2, Package, Loader2, Edit2, 
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
-  Tag, Image as ImageIcon, Receipt, ChevronRight, Save, 
-  Layers, Sliders, Percent, Barcode, Box, Eye, LayoutGrid
+  Tag, ImageIcon, Receipt, ChevronRight, Save, 
+  Layers, Sliders, Percent, Barcode, Box, Eye, LayoutGrid,
+  MapPin, Phone, Globe, CreditCard, QrCode, Building2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
@@ -113,16 +114,16 @@ export default function AdminDashboard() {
       <main className="flex-1 p-8">
         <Tabs defaultValue="menu" className="space-y-6 max-w-7xl mx-auto">
           <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem]">
-            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Artículos y Menú</TabsTrigger>
+            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Gestión de Menú</TabsTrigger>
             <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
-            <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Config</TabsTrigger>
+            <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           </TabsList>
 
           <TabsContent value="menu" className="space-y-12">
             <section className="space-y-6">
               <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                 <Package className="h-6 w-6 text-primary" />
-                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Gestión de Artículos</h2>
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Artículos y Platillos</h2>
               </div>
               <ArticulosManager items={items || []} categories={categories || []} modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
             </section>
@@ -148,7 +149,7 @@ export default function AdminDashboard() {
             <section className="space-y-6">
               <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                 <Percent className="h-6 w-6 text-primary" />
-                <h2 className="text-xl font-black uppercase italic tracking-tighter">Descuentos y Promociones</h2>
+                <h2 className="text-xl font-black uppercase italic tracking-tighter">Descuentos</h2>
               </div>
               <DiscountsManager discounts={discounts || []} orgId={orgId!} locId={locId!} />
             </section>
@@ -218,15 +219,15 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
       const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
       if (editingId) {
         await updateDoc(doc(colRef, editingId), cleanData);
-        toast({ title: "Artículo actualizado correctamente" });
+        toast({ title: "Artículo actualizado" });
       } else {
         await addDoc(colRef, { ...cleanData, createdAt: Date.now() });
-        toast({ title: "Artículo creado y guardado" });
+        toast({ title: "Artículo creado" });
       }
       setForm(initialState);
       setEditingId(null);
     } catch (e) { 
-      toast({ variant: 'destructive', title: "Error al guardar en la base de datos" }); 
+      toast({ variant: 'destructive', title: "Error al guardar" }); 
     } finally { 
       setLoading(false); 
     }
@@ -235,11 +236,11 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
   return (
     <div className="space-y-8">
       <Card className="rounded-[2rem] border-2 border-t-8 border-t-primary shadow-xl">
-        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">{editingId ? 'EDITAR ARTÍCULO EXISTENTE' : 'NUEVO ARTÍCULO'}</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">{editingId ? 'EDITAR ARTÍCULO' : 'NUEVO ARTÍCULO'}</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label className="text-[10px] font-black uppercase">Nombre Comercial *</Label>
+              <Label className="text-[10px] font-black uppercase">Nombre *</Label>
               <Input value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} className="h-12 rounded-xl" />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -266,8 +267,8 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
               <Select value={form.soldBy} onValueChange={(v: any) => setForm({...form, soldBy: v})}>
                 <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unidad">Por Unidad</SelectItem>
-                  <SelectItem value="peso">Por Peso (kg)</SelectItem>
+                  <SelectItem value="unidad">Unidad</SelectItem>
+                  <SelectItem value="peso">Peso (kg)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -276,29 +277,29 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase"><Barcode className="h-3 w-3 inline mr-1" /> Código de Barras</Label>
+                <Label className="text-[10px] font-black uppercase"><Barcode className="h-3 w-3 inline mr-1" /> Código Barras</Label>
                 <Input value={form.barcode || ''} onChange={e => setForm({...form, barcode: e.target.value})} className="h-12 rounded-xl" />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Referencia Interna</Label>
+                <Label className="text-[10px] font-black uppercase">Referencia</Label>
                 <Input value={form.reference || ''} onChange={e => setForm({...form, reference: e.target.value})} className="h-12 rounded-xl" />
               </div>
             </div>
             <div className="p-4 bg-muted/20 rounded-2xl border-2 space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><Box className="h-3 w-3" /> Controlar Inventario</Label>
+                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><Box className="h-3 w-3" /> Controlar Stock</Label>
                 <Checkbox checked={!!form.trackInventory} onCheckedChange={v => setForm({...form, trackInventory: !!v})} />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Piezas / Stock Disponible</Label>
+                <Label className="text-[10px] font-black uppercase">Piezas Disponibles</Label>
                 <Input type="number" disabled={!form.trackInventory} value={form.inventoryCount ?? 0} onChange={e => setForm({...form, inventoryCount: Number(e.target.value)})} className="h-10 rounded-xl" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase">Imagen o Icono</Label>
+              <Label className="text-[10px] font-black uppercase">Cargar Imagen</Label>
               <div className="flex gap-4 items-center">
                 <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
-                  {form.image ? <img src={form.image} className="w-full h-full object-cover" /> : <Package className="h-6 w-6 opacity-20" />}
+                  {form.image ? <img src={form.image} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
                 </div>
                 <div className="flex-1">
                   <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-xs rounded-xl cursor-pointer file:font-black file:uppercase file:text-[8px] file:bg-primary file:text-white file:border-0 file:rounded-md file:mr-2" />
@@ -343,10 +344,10 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
                 ))}
               </div>
             </div>
-            <Button className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl" onClick={save} disabled={loading}>
+            <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl" onClick={save} disabled={loading}>
               {loading ? <Loader2 className="animate-spin" /> : editingId ? 'GUARDAR CAMBIOS' : 'AÑADIR AL MENÚ'}
             </Button>
-            {editingId && <Button variant="ghost" className="w-full font-bold uppercase text-[10px]" onClick={() => {setEditingId(null); setForm(initialState);}}>Cancelar Edición</Button>}
+            {editingId && <Button variant="ghost" className="w-full font-bold uppercase text-[10px]" onClick={() => {setEditingId(null); setForm(initialState);}}>Cancelar</Button>}
           </div>
         </CardContent>
       </Card>
@@ -489,7 +490,7 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
               <div key={m.id} className="flex justify-between items-center p-3 border-2 rounded-xl bg-white group">
                 <div>
                   <h4 className="font-black text-xs uppercase italic">{m.name}</h4>
-                  <p className="text-[8px] font-bold text-muted-foreground">{m.options.length} opciones vinculadas</p>
+                  <p className="text-[8px] font-bold text-muted-foreground">{m.options.length} opciones</p>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setEditingId(m.id!); setName(m.name); setOptions(m.options);}}><Edit2 className="h-3 w-3" /></Button>
@@ -523,7 +524,7 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
       <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden flex flex-col justify-center p-6 border-dashed border-primary/40 bg-primary/5">
         <div className="space-y-4">
           <div className="space-y-1">
-            <Label className="text-[10px] font-black uppercase">Nombre de Promo</Label>
+            <Label className="text-[10px] font-black uppercase">Nombre Promo</Label>
             <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="h-10 rounded-xl bg-white" />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -546,7 +547,7 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
         </div>
       </Card>
       {discounts.map(d => (
-        <Card key={d.id} className="bg-white border-2 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 group relative shadow-sm h-[200px]">
+        <Card key={d.id} className="bg-white border-2 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 group relative shadow-sm h-[180px]">
           <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'discounts', d.id!))}>
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -601,7 +602,7 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <Card className="border-t-8 border-t-primary shadow-xl rounded-[2rem] overflow-hidden border-2">
-        <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">{editingId ? 'EDITAR EQUIPO' : 'ALTA DE EQUIPO'}</CardTitle></CardHeader>
+        <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic tracking-tighter text-2xl">{editingId ? 'EDITAR PERSONAL' : 'NUEVO PERSONAL'}</CardTitle></CardHeader>
         <CardContent className="space-y-6 pt-8">
            <div className="space-y-4">
               <div className="space-y-1">
@@ -664,9 +665,14 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
 
 function ConfigManager({ location, orgId, locId }: { location?: Location, orgId: string, locId: string }) {
   const db = useFirestore();
+  const { setLoc } = useTenant();
   const { toast } = useToast();
-  const [form, setForm] = useState<Partial<Location>>({ name: '', address: '', phoneNumber: '', taxRate: 0, logo: '', ticketHeader: '', ticketFooter: '' });
+  const [form, setForm] = useState<Partial<Location>>({ 
+    name: '', address: '', phoneNumber: '', taxRate: 0, cardFee: 0, 
+    logo: '', websiteUrl: '', ticketHeader: '', ticketFooter: '' 
+  });
   const [loading, setLoading] = useState(false);
+  const [allLocations, setAllLocations] = useState<Location[]>([]);
 
   useEffect(() => { 
     if (location) {
@@ -675,53 +681,150 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
         address: location.address || '',
         phoneNumber: location.phoneNumber || '',
         taxRate: location.taxRate || 0,
+        cardFee: location.cardFee || 0,
         logo: location.logo || '',
+        websiteUrl: location.websiteUrl || '',
         ticketHeader: location.ticketHeader || '',
         ticketFooter: location.ticketFooter || ''
       });
     }
-  }, [location]);
+    fetchLocations();
+  }, [location, orgId]);
+
+  const fetchLocations = async () => {
+    if (!orgId) return;
+    const snap = await getDocs(collection(db, 'orgs', orgId, 'locations'));
+    setAllLocations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Location)));
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setForm(prev => ({ ...prev, logo: reader.result as string }));
+      reader.readAsDataURL(file);
+    }
+  };
 
   const save = async () => {
     setLoading(true);
     try {
       await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), { ...form, updatedAt: Date.now() });
-      toast({ title: "Configuración guardada" });
-    } catch (e) { toast({ variant: 'destructive' }); }
+      toast({ title: "Configuración actualizada" });
+    } catch (e) { toast({ variant: 'destructive', title: "Error al guardar" }); }
     finally { setLoading(false); }
   };
 
+  const createNewLocation = async () => {
+    const name = prompt("Nombre de la nueva sucursal:");
+    if (!name) return;
+    try {
+      const newLocRef = await addDoc(collection(db, 'orgs', orgId, 'locations'), {
+        name,
+        createdAt: Date.now(),
+        taxRate: 0,
+        cardFee: 0
+      });
+      toast({ title: "Sucursal creada" });
+      fetchLocations();
+    } catch (e) { toast({ variant: 'destructive' }); }
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+       {/* Sedes y Sucursales */}
        <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
-          <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic text-xl">Sede Operativa</CardTitle></CardHeader>
+          <CardHeader className="bg-muted/30 border-b">
+             <div className="flex justify-between items-center">
+                <CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><Building2 className="h-5 w-5" /> Sedes</CardTitle>
+                <Button size="sm" onClick={createNewLocation} className="rounded-xl h-8 px-4 font-black"><Plus className="h-4 w-4 mr-1" /> AÑADIR</Button>
+             </div>
+          </CardHeader>
+          <CardContent className="p-6">
+             <ScrollArea className="h-[300px] pr-2">
+                <div className="space-y-2">
+                   {allLocations.map(l => (
+                      <Button 
+                        key={l.id} 
+                        variant={l.id === locId ? 'default' : 'outline'} 
+                        className="w-full h-16 justify-between rounded-xl px-4 border-2"
+                        onClick={() => setLoc(l)}
+                      >
+                        <div className="text-left">
+                           <div className="font-black text-xs uppercase">{l.name}</div>
+                           <div className="text-[8px] font-bold opacity-60 truncate max-w-[150px]">{l.address || 'Ubicación central'}</div>
+                        </div>
+                        {l.id === locId && <Badge className="bg-white text-primary text-[8px] font-black">ACTIVA</Badge>}
+                      </Button>
+                   ))}
+                </div>
+             </ScrollArea>
+          </CardContent>
+       </Card>
+
+       {/* Finanzas y Operación */}
+       <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
+          <CardHeader className="bg-muted/30 border-b"><CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><CreditCard className="h-5 w-5" /> Finanzas</CardTitle></CardHeader>
           <CardContent className="p-8 space-y-4">
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Nombre Comercial</Label>
+                <Label className="text-[10px] font-black uppercase">Nombre de Sucursal</Label>
                 <Input value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} className="h-12 rounded-xl" />
              </div>
-             <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">IVA / TAX (%)</Label>
-                <Input type="number" value={form.taxRate ?? 0} onChange={e => setForm({...form, taxRate: Number(e.target.value)})} className="h-12 rounded-xl" />
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                   <Label className="text-[10px] font-black uppercase">IVA / TAX (%)</Label>
+                   <Input type="number" value={form.taxRate ?? 0} onChange={e => setForm({...form, taxRate: Number(e.target.value)})} className="h-12 rounded-xl" />
+                </div>
+                <div className="space-y-1">
+                   <Label className="text-[10px] font-black uppercase">Comisión Tarjeta (%)</Label>
+                   <Input type="number" value={form.cardFee ?? 0} onChange={e => setForm({...form, cardFee: Number(e.target.value)})} className="h-12 rounded-xl" />
+                </div>
              </div>
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Teléfono</Label>
-                <Input value={form.phoneNumber || ''} onChange={e => setForm({...form, phoneNumber: e.target.value})} className="h-12 rounded-xl" />
+                <Label className="text-[10px] font-black uppercase">Teléfono de Contacto</Label>
+                <div className="relative">
+                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                   <Input value={form.phoneNumber || ''} onChange={e => setForm({...form, phoneNumber: e.target.value})} className="h-12 pl-12 rounded-xl" />
+                </div>
+             </div>
+             <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase">Dirección Física</Label>
+                <div className="relative">
+                   <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                   <Input value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} className="h-12 pl-12 rounded-xl" />
+                </div>
              </div>
              <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={save} disabled={loading}>GUARDAR CAMBIOS</Button>
           </CardContent>
        </Card>
 
+       {/* Personalización Ticket */}
        <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
-          <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic text-xl">Personalización Ticket</CardTitle></CardHeader>
+          <CardHeader className="bg-muted/30 border-b"><CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><Receipt className="h-5 w-5" /> Ticket POS</CardTitle></CardHeader>
           <CardContent className="p-8 space-y-4">
-             <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Encabezado</Label>
-                <Textarea value={form.ticketHeader || ''} onChange={e => setForm({...form, ticketHeader: e.target.value})} className="min-h-[120px] rounded-xl" />
+             <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase">Logo del Ticket</Label>
+                <div className="flex gap-4 items-center">
+                   <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
+                      {form.logo ? <img src={form.logo} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
+                   </div>
+                   <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-[8px] font-black rounded-xl" />
+                </div>
              </div>
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Pie de Página</Label>
-                <Textarea value={form.ticketFooter || ''} onChange={e => setForm({...form, ticketFooter: e.target.value})} className="min-h-[120px] rounded-xl" />
+                <Label className="text-[10px] font-black uppercase">Enlace para QR (Menú/Web)</Label>
+                <div className="relative">
+                   <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                   <Input value={form.websiteUrl || ''} onChange={e => setForm({...form, websiteUrl: e.target.value})} placeholder="https://miweb.com" className="h-12 pl-12 rounded-xl" />
+                </div>
+             </div>
+             <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase">Encabezado Mensaje</Label>
+                <Textarea value={form.ticketHeader || ''} onChange={e => setForm({...form, ticketHeader: e.target.value})} className="min-h-[80px] rounded-xl text-xs" />
+             </div>
+             <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase">Pie de Página / Comentarios</Label>
+                <Textarea value={form.ticketFooter || ''} onChange={e => setForm({...form, ticketFooter: e.target.value})} className="min-h-[80px] rounded-xl text-xs" />
              </div>
           </CardContent>
        </Card>

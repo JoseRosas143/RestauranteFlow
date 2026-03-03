@@ -49,7 +49,9 @@ export interface Location {
   address?: string;
   phoneNumber?: string;
   taxRate?: number;
+  cardFee?: number; // Comisión bancaria
   logo?: string;
+  websiteUrl?: string; // Para el QR
   ticketHeader?: string;
   ticketFooter?: string;
   createdAt: number;
