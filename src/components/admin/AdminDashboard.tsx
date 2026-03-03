@@ -20,7 +20,7 @@ import {
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
   Tag, ImageIcon, Receipt, ChevronRight, Save, 
   Layers, Sliders, Percent, Barcode, Box, Eye, LayoutGrid,
-  MapPin, Phone, Globe, CreditCard, QrCode, Building2
+  MapPin, Phone, Globe, CreditCard, QrCode, Building2, AlertTriangle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
@@ -114,12 +114,13 @@ export default function AdminDashboard() {
       <main className="flex-1 p-8">
         <Tabs defaultValue="menu" className="space-y-6 max-w-7xl mx-auto">
           <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem]">
-            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
+            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Gestión de Menú</TabsTrigger>
             <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
             <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           </TabsList>
 
           <TabsContent value="menu" className="space-y-12">
+            {/* UNIFIED MENU MANAGEMENT TAB */}
             <section className="space-y-6">
               <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                 <Package className="h-6 w-6 text-primary" />
@@ -707,6 +708,7 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
   };
 
   const save = async () => {
+    if (!locId) return;
     setLoading(true);
     try {
       await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), { ...form, updatedAt: Date.now() });
@@ -723,9 +725,25 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
         name,
         createdAt: Date.now(),
         taxRate: 0,
-        cardFee: 0
+        cardFee: 0,
+        address: '',
+        phoneNumber: ''
       });
       toast({ title: "Sucursal creada" });
+      fetchLocations();
+    } catch (e) { toast({ variant: 'destructive' }); }
+  };
+
+  const deleteLocation = async (id: string, name: string) => {
+    if (id === locId) {
+      toast({ variant: 'destructive', title: 'Acción bloqueada', description: 'No puedes eliminar la sucursal activa.' });
+      return;
+    }
+    if (!confirm(`¿Estás seguro de eliminar la sucursal "${name}"? Esta acción no se puede deshacer.`)) return;
+    
+    try {
+      await deleteDoc(doc(db, 'orgs', orgId, 'locations', id));
+      toast({ title: "Sucursal eliminada" });
       fetchLocations();
     } catch (e) { toast({ variant: 'destructive' }); }
   };
@@ -744,18 +762,29 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
              <ScrollArea className="h-[300px] pr-2">
                 <div className="space-y-2">
                    {allLocations.map(l => (
-                      <Button 
-                        key={l.id} 
-                        variant={l.id === locId ? 'default' : 'outline'} 
-                        className="w-full h-16 justify-between rounded-xl px-4 border-2"
-                        onClick={() => setLoc(l)}
-                      >
-                        <div className="text-left">
-                           <div className="font-black text-xs uppercase">{l.name}</div>
-                           <div className="text-[8px] font-bold opacity-60 truncate max-w-[150px]">{l.address || 'Ubicación central'}</div>
-                        </div>
-                        {l.id === locId && <Badge className="bg-white text-primary text-[8px] font-black">ACTIVA</Badge>}
-                      </Button>
+                      <div key={l.id} className="group relative">
+                        <Button 
+                          variant={l.id === locId ? 'default' : 'outline'} 
+                          className="w-full h-16 justify-between rounded-xl px-4 border-2 pr-12"
+                          onClick={() => setLoc(l)}
+                        >
+                          <div className="text-left">
+                             <div className="font-black text-xs uppercase">{l.name}</div>
+                             <div className="text-[8px] font-bold opacity-60 truncate max-w-[150px]">{l.address || 'Ubicación central'}</div>
+                          </div>
+                          {l.id === locId && <Badge className="bg-white text-primary text-[8px] font-black">ACTIVA</Badge>}
+                        </Button>
+                        {l.id !== locId && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => { e.stopPropagation(); deleteLocation(l.id, l.name); }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                    ))}
                 </div>
              </ScrollArea>
