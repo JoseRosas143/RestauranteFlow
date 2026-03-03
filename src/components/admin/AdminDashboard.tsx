@@ -19,7 +19,7 @@ import {
   Plus, Trash2, Package, Loader2, Edit2, 
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
   Tag, Image as ImageIcon, ClipboardList, Receipt, ChevronRight, Save, 
-  Layers, Sliders, Percent, Barcode, Box
+  Layers, Sliders, Percent, Barcode, Box, Upload, Eye
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount, TpvShape } from '@/lib/types';
@@ -126,7 +126,7 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="categorias">
-            <CategoriasManager categories={categories || []} orgId={orgId!} locId={locId!} />
+            <CategoriasManager categories={categories || []} items={items || []} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
           <TabsContent value="modificadores">
@@ -163,6 +163,17 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
   };
   const [form, setForm] = useState<Partial<MenuItem>>(initialState);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setForm(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const save = async () => {
     if (!form.name || !form.category) {
       toast({ variant: 'destructive', title: 'Faltan datos', description: 'Nombre y categoría obligatorios.' });
@@ -170,16 +181,37 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
     }
     setLoading(true);
     try {
-      const data = { ...form, updatedAt: Date.now() };
-      delete (data as any).id;
+      const cleanData = {
+        name: form.name || '',
+        price: Number(form.price) || 0,
+        cost: Number(form.cost) || 0,
+        category: form.category || '',
+        reference: form.reference || '',
+        barcode: form.barcode || '',
+        soldBy: form.soldBy || 'unidad',
+        trackInventory: !!form.trackInventory,
+        inventoryCount: Number(form.inventoryCount) || 0,
+        tpvColor: form.tpvColor || '#B8732E',
+        tpvShape: form.tpvShape || 'cuadrado',
+        modifierIds: form.modifierIds || [],
+        image: form.image || '',
+        updatedAt: Date.now()
+      };
+
       const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
-      if (editingId) await updateDoc(doc(colRef, editingId), data);
-      else await addDoc(colRef, { ...data, createdAt: Date.now() });
+      if (editingId) {
+        await updateDoc(doc(colRef, editingId), cleanData);
+      } else {
+        await addDoc(colRef, { ...cleanData, createdAt: Date.now() });
+      }
       setForm(initialState);
       setEditingId(null);
       toast({ title: "Guardado correctamente" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error al guardar" }); }
-    finally { setLoading(false); }
+    } catch (e) { 
+      toast({ variant: 'destructive', title: "Error al guardar" }); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
@@ -195,11 +227,11 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase">Precio Venta ($)</Label>
-                <Input type="number" value={form.price || ''} onChange={e => setForm({...form, price: Number(e.target.value)})} className="h-12 rounded-xl" />
+                <Input type="number" value={form.price ?? 0} onChange={e => setForm({...form, price: Number(e.target.value)})} className="h-12 rounded-xl" />
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase">Costo ($)</Label>
-                <Input type="number" value={form.cost || ''} onChange={e => setForm({...form, cost: Number(e.target.value)})} className="h-12 rounded-xl" />
+                <Input type="number" value={form.cost ?? 0} onChange={e => setForm({...form, cost: Number(e.target.value)})} className="h-12 rounded-xl" />
               </div>
             </div>
             <div className="space-y-1">
@@ -237,16 +269,24 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
             <div className="p-4 bg-muted/20 rounded-2xl border-2 space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-[10px] font-black uppercase flex items-center gap-2"><Box className="h-3 w-3" /> Controlar Inventario</Label>
-                <Checkbox checked={form.trackInventory} onCheckedChange={v => setForm({...form, trackInventory: !!v})} />
+                <Checkbox checked={!!form.trackInventory} onCheckedChange={v => setForm({...form, trackInventory: !!v})} />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Stock Disponible</Label>
-                <Input type="number" disabled={!form.trackInventory} value={form.inventoryCount || 0} onChange={e => setForm({...form, inventoryCount: Number(e.target.value)})} className="h-10 rounded-xl" />
+                <Label className="text-[10px] font-black uppercase">Piezas / Stock Disponible</Label>
+                <Input type="number" disabled={!form.trackInventory} value={form.inventoryCount ?? 0} onChange={e => setForm({...form, inventoryCount: Number(e.target.value)})} className="h-10 rounded-xl" />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black uppercase">Imagen URL</Label>
-              <Input value={form.image || ''} onChange={e => setForm({...form, image: e.target.value})} placeholder="https://..." className="h-12 rounded-xl" />
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase">Imagen del Producto</Label>
+              <div className="flex gap-4 items-center">
+                <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
+                  {form.image ? <img src={form.image} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
+                </div>
+                <div className="flex-1">
+                  <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-xs rounded-xl cursor-pointer file:font-black file:uppercase file:text-[8px] file:bg-primary file:text-white file:border-0 file:rounded-md file:mr-2" />
+                  {form.image && <Button variant="ghost" size="sm" onClick={() => setForm({...form, image: ''})} className="mt-1 h-6 text-[8px] font-black uppercase text-destructive">Eliminar</Button>}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -254,7 +294,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase">Color TPV</Label>
-                <Input type="color" value={form.tpvColor} onChange={e => setForm({...form, tpvColor: e.target.value})} className="h-12 w-full rounded-xl cursor-pointer" />
+                <Input type="color" value={form.tpvColor || '#B8732E'} onChange={e => setForm({...form, tpvColor: e.target.value})} className="h-12 w-full rounded-xl cursor-pointer" />
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase">Forma TPV</Label>
@@ -270,9 +310,9 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase">Modificadores Aplicables</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
                 {modifiers.map(m => (
-                  <div key={m.id} className="flex items-center gap-2 text-xs">
+                  <div key={m.id} className="flex items-center gap-2 text-[10px] font-bold bg-muted/40 p-2 rounded-lg">
                     <Checkbox 
                       checked={form.modifierIds?.includes(m.id!)} 
                       onCheckedChange={v => {
@@ -281,7 +321,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
                         else setForm({...form, modifierIds: ids.filter(id => id !== m.id)});
                       }}
                     />
-                    <span>{m.name}</span>
+                    <span className="truncate">{m.name}</span>
                   </div>
                 ))}
               </div>
@@ -289,26 +329,33 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
             <Button className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl" onClick={save} disabled={loading}>
               {loading ? <Loader2 className="animate-spin" /> : editingId ? 'ACTUALIZAR' : 'CREAR ARTÍCULO'}
             </Button>
-            {editingId && <Button variant="ghost" className="w-full font-bold" onClick={() => {setEditingId(null); setForm(initialState);}}>CANCELAR</Button>}
+            {editingId && <Button variant="ghost" className="w-full font-bold uppercase text-[10px]" onClick={() => {setEditingId(null); setForm(initialState);}}>Cancelar Edición</Button>}
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pb-12">
         {items.map(item => (
-          <Card key={item.id} className="rounded-2xl border-2 hover:border-primary transition-all group overflow-hidden bg-white">
+          <Card key={item.id} className="rounded-2xl border-2 hover:border-primary transition-all group overflow-hidden bg-white shadow-sm">
             <div className="p-4 flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl border-2 flex-shrink-0 flex items-center justify-center overflow-hidden" style={{ backgroundColor: item.tpvColor }}>
+              <div className={`w-14 h-14 rounded-xl border-2 flex-shrink-0 flex items-center justify-center overflow-hidden ${item.tpvShape === 'circulo' ? 'rounded-full' : ''}`} style={{ backgroundColor: item.tpvColor }}>
                 {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <Package className="h-6 w-6 text-white" />}
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-black text-sm uppercase italic truncate">{item.name}</h3>
                 <p className="text-[9px] font-bold text-muted-foreground uppercase">{item.category}</p>
-                <p className="font-black text-primary text-md">${item.price.toFixed(2)}</p>
+                <div className="flex justify-between items-end mt-1">
+                   <p className="font-black text-primary text-md leading-none">${item.price.toFixed(2)}</p>
+                   {item.trackInventory && (
+                     <Badge variant="outline" className={`text-[8px] font-black px-1.5 h-4 ${item.inventoryCount! <= 5 ? 'text-destructive border-destructive' : 'text-muted-foreground'}`}>
+                        STOCK: {item.inventoryCount}
+                     </Badge>
+                   )}
+                </div>
               </div>
               <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => {setForm(item); setEditingId(item.id!);}}><Edit2 className="h-3 w-3" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-full" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'menuItems', item.id!))}><Trash2 className="h-3 w-3" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={() => {setForm(item); setEditingId(item.id!);}}><Edit2 className="h-3 w-3" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-full hover:bg-destructive/10" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'menuItems', item.id!))}><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
           </Card>
@@ -318,15 +365,16 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
   );
 }
 
-function CategoriasManager({ categories, orgId, locId }: { categories: Category[], orgId: string, locId: string }) {
+function CategoriasManager({ categories, items, orgId, locId }: { categories: Category[], items: MenuItem[], orgId: string, locId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
   const [form, setForm] = useState({ name: '', color: '#B8732E' });
+  const [viewItemsId, setViewItemsId] = useState<string | null>(null);
 
   const save = async () => {
     if (!form.name) return;
     try {
-      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), form);
+      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), { ...form, updatedAt: Date.now() });
       setForm({ name: '', color: '#B8732E' });
       toast({ title: "Categoría creada" });
     } catch (e) { toast({ variant: 'destructive', title: "Error" }); }
@@ -343,22 +391,42 @@ function CategoriasManager({ categories, orgId, locId }: { categories: Category[
           </div>
           <div className="space-y-1">
             <Label className="text-[10px] font-black uppercase">Color de Identificación</Label>
-            <Input type="color" value={form.color} onChange={e => setForm({...form, color: e.target.value})} className="h-12 w-full cursor-pointer" />
+            <Input type="color" value={form.color} onChange={e => setForm({...form, color: e.target.value})} className="h-12 w-full cursor-pointer rounded-xl" />
           </div>
           <Button className="w-full h-14 font-black rounded-2xl" onClick={save}>AGREGAR CATEGORÍA</Button>
         </CardContent>
       </Card>
-      <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {categories.map(cat => (
-          <div key={cat.id} className="bg-white border-2 rounded-2xl p-4 flex items-center justify-between group">
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: cat.color }} />
-              <span className="font-black uppercase text-xs italic tracking-tighter">{cat.name}</span>
+          <Card key={cat.id} className="bg-white border-2 rounded-2xl overflow-hidden group shadow-sm h-fit">
+            <div className="p-4 flex items-center justify-between border-b bg-muted/10">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                <span className="font-black uppercase text-xs italic tracking-tighter">{cat.name}</span>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewItemsId(viewItemsId === cat.id ? null : cat.id!)}><Eye className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'categories', cat.id!))}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'categories', cat.id!))}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+            {viewItemsId === cat.id && (
+              <div className="p-4 bg-muted/5 space-y-2">
+                <p className="text-[8px] font-black uppercase text-muted-foreground mb-2">Artículos en esta categoría:</p>
+                {items.filter(i => i.category === cat.name).length === 0 ? (
+                  <p className="text-[10px] font-bold text-muted-foreground italic">No hay artículos aún.</p>
+                ) : (
+                  items.filter(i => i.category === cat.name).map(i => (
+                    <div key={i.id} className="flex justify-between items-center text-[10px] font-bold py-1 border-b last:border-0">
+                      <span>{i.name}</span>
+                      <span className="text-primary">${i.price}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </Card>
         ))}
       </div>
     </div>
@@ -382,7 +450,7 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
   const save = async () => {
     if (!name || options.length === 0) return;
     try {
-      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'modifiers'), { name, options });
+      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'modifiers'), { name, options, updatedAt: Date.now() });
       setName(''); setOptions([]);
       toast({ title: "Grupo de modificadores guardado" });
     } catch (e) { toast({ variant: 'destructive' }); }
@@ -400,15 +468,18 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
           <div className="p-4 bg-muted/30 rounded-2xl space-y-4">
             <p className="text-[10px] font-black uppercase text-center border-b pb-2">Agregar Opciones</p>
             <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Nombre" value={optName} onChange={e => setOptName(e.target.value)} className="h-10 rounded-xl" />
-              <Input type="number" placeholder="$" value={optPrice || ''} onChange={e => setOptPrice(Number(e.target.value))} className="h-10 rounded-xl" />
+              <Input placeholder="Opción" value={optName} onChange={e => setOptName(e.target.value)} className="h-10 rounded-xl" />
+              <Input type="number" placeholder="Precio ($)" value={optPrice || ''} onChange={e => setOptPrice(Number(e.target.value))} className="h-10 rounded-xl" />
             </div>
-            <Button variant="secondary" className="w-full rounded-xl font-bold" onClick={addOption}>VINCULAR OPCIÓN</Button>
-            <div className="space-y-2">
+            <Button variant="secondary" className="w-full rounded-xl font-bold uppercase text-[10px]" onClick={addOption}>Vincular Opción</Button>
+            <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
               {options.map((o, i) => (
-                <div key={i} className="flex justify-between text-xs font-bold bg-white p-2 rounded-lg">
+                <div key={i} className="flex justify-between items-center text-[10px] font-bold bg-white p-2 rounded-lg border">
                   <span>{o.name}</span>
-                  <span className="text-primary">+${o.price}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-primary">+${o.price}</span>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => setOptions(options.filter((_, idx) => idx !== i))}><X className="h-3 w-3" /></Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -418,11 +489,11 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
       </Card>
       <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
         {modifiers.map(m => (
-          <Card key={m.id} className="rounded-2xl border-2 p-6 flex flex-col justify-between group relative overflow-hidden">
-            <div className="absolute top-4 right-4"><Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'modifiers', m.id!))}><Trash2 className="h-4 w-4" /></Button></div>
-            <h4 className="font-black uppercase italic text-lg mb-4 text-primary">{m.name}</h4>
+          <Card key={m.id} className="rounded-2xl border-2 p-6 flex flex-col justify-between group relative overflow-hidden bg-white shadow-sm">
+            <div className="absolute top-4 right-4"><Button variant="ghost" size="icon" className="text-destructive h-8 w-8 hover:bg-destructive/10" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'modifiers', m.id!))}><Trash2 className="h-4 w-4" /></Button></div>
+            <h4 className="font-black uppercase italic text-lg mb-4 text-primary leading-none">{m.name}</h4>
             <div className="flex flex-wrap gap-2">
-              {m.options.map((o, i) => <Badge key={i} variant="outline" className="font-bold">{o.name} (+${o.price})</Badge>)}
+              {m.options.map((o, i) => <Badge key={i} variant="secondary" className="font-bold text-[9px] px-2 py-1">+{o.name} (${o.price})</Badge>)}
             </div>
           </Card>
         ))}
@@ -439,7 +510,7 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
   const save = async () => {
     if (!form.name || !form.value) return;
     try {
-      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), form);
+      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), { ...form, updatedAt: Date.now() });
       setForm({ name: '', value: 0, type: 'porcentaje' });
       toast({ title: "Descuento configurado" });
     } catch (e) { toast({ variant: 'destructive' }); }
@@ -475,11 +546,11 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
       </Card>
       <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
         {discounts.map(d => (
-          <div key={d.id} className="bg-white border-2 rounded-2xl p-6 flex flex-col items-center gap-2 group relative">
+          <div key={d.id} className="bg-white border-2 rounded-2xl p-6 flex flex-col items-center gap-2 group relative shadow-sm">
             <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'discounts', d.id!))}>
               <Trash2 className="h-4 w-4" />
             </Button>
-            <h5 className="font-black uppercase italic text-xs tracking-tighter">{d.name}</h5>
+            <h5 className="font-black uppercase italic text-xs tracking-tighter text-muted-foreground">{d.name}</h5>
             <div className="text-3xl font-black text-primary">
                {d.type === 'porcentaje' ? `${d.value}%` : `$${d.value}`}
             </div>
@@ -506,10 +577,21 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
     setLoading(true);
     try {
       const path = collection(db, 'orgs', orgId, 'users');
-      const data = { ...newUser, orgId, updatedAt: Date.now() };
-      delete (data as any).id;
-      if (editingId) await updateDoc(doc(path, editingId), data);
-      else await addDoc(path, { ...data, uid: `STAFF-${Date.now()}`, createdAt: Date.now() });
+      const cleanData = {
+        name: newUser.name || '',
+        email: newUser.email || '',
+        role: newUser.role || 'cashier',
+        pin: newUser.pin || '',
+        allowedLocIds: newUser.allowedLocIds || [locId],
+        orgId,
+        updatedAt: Date.now()
+      };
+
+      if (editingId) {
+        await updateDoc(doc(path, editingId), cleanData);
+      } else {
+        await addDoc(path, { ...cleanData, uid: `STAFF-${Date.now()}`, createdAt: Date.now() });
+      }
       setNewUser(initialStaffState);
       setEditingId(null);
       toast({ title: "Staff actualizado correctamente" });
@@ -553,7 +635,7 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
                  </div>
               </div>
               <Button className="w-full h-16 font-black text-xl shadow-2xl shadow-primary/20 rounded-2xl" onClick={saveStaffUser} disabled={loading}>{editingId ? 'ACTUALIZAR DATOS' : 'VINCULAR A LA SEDE'}</Button>
-              {editingId && <Button variant="ghost" className="w-full font-bold" onClick={() => {setEditingId(null); setNewUser(initialStaffState);}}>CANCELAR</Button>}
+              {editingId && <Button variant="ghost" className="w-full font-bold uppercase text-[10px]" onClick={() => {setEditingId(null); setNewUser(initialStaffState);}}>Cancelar</Button>}
            </div>
         </CardContent>
       </Card>
@@ -592,24 +674,55 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
 function ConfigManager({ location, orgId, locId }: { location?: Location, orgId: string, locId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
-  const [form, setForm] = useState<Partial<Location>>(location || { name: '', address: '', phoneNumber: '', taxRate: 0, logo: '', ticketHeader: '', ticketFooter: '' });
+  const [form, setForm] = useState<Partial<Location>>({ name: '', address: '', phoneNumber: '', taxRate: 0, logo: '', ticketHeader: '', ticketFooter: '' });
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { if (location) setForm(location); }, [location]);
+  useEffect(() => { 
+    if (location) {
+      setForm({
+        name: location.name || '',
+        address: location.address || '',
+        phoneNumber: location.phoneNumber || '',
+        taxRate: location.taxRate || 0,
+        logo: location.logo || '',
+        ticketHeader: location.ticketHeader || '',
+        ticketFooter: location.ticketFooter || ''
+      });
+    }
+  }, [location]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setForm(prev => ({ ...prev, logo: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const save = async () => {
     setLoading(true);
     try {
-      const data = { ...form, updatedAt: Date.now() };
-      delete (data as any).id;
-      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), data);
+      const cleanData = {
+        name: form.name || '',
+        address: form.address || '',
+        phoneNumber: form.phoneNumber || '',
+        taxRate: Number(form.taxRate) || 0,
+        logo: form.logo || '',
+        ticketHeader: form.ticketHeader || '',
+        ticketFooter: form.ticketFooter || '',
+        updatedAt: Date.now()
+      };
+      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), cleanData);
       toast({ title: "Configuración guardada correctamente" });
     } catch (e) { toast({ variant: 'destructive', title: "Error al guardar" }); }
     finally { setLoading(false); }
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto pb-12">
        <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden">
           <CardHeader className="bg-muted/30"><CardTitle className="font-black uppercase italic text-xl">Información de la Sede</CardTitle></CardHeader>
           <CardContent className="pt-8 space-y-4">
@@ -628,12 +741,17 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
                 </div>
                 <div className="space-y-1">
                    <Label className="text-[10px] font-black uppercase ml-1">Impuesto (IVA/TAX %)</Label>
-                   <Input type="number" value={form.taxRate || 0} onChange={e => setForm({...form, taxRate: Number(e.target.value)})} className="h-12 rounded-xl" />
+                   <Input type="number" value={form.taxRate ?? 0} onChange={e => setForm({...form, taxRate: Number(e.target.value)})} className="h-12 rounded-xl" />
                 </div>
              </div>
-             <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase ml-1">URL Logo Sucursal</Label>
-                <Input value={form.logo || ''} onChange={e => setForm({...form, logo: e.target.value})} className="h-12 rounded-xl" />
+             <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase ml-1">Logo de la Sucursal</Label>
+                <div className="flex gap-4 items-center">
+                   <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
+                      {form.logo ? <img src={form.logo} className="w-full h-full object-cover" /> : <Store className="h-6 w-6 opacity-20" />}
+                   </div>
+                   <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-xs rounded-xl cursor-pointer file:font-black file:uppercase file:text-[8px] file:bg-primary file:text-white file:border-0 file:rounded-md file:mr-2" />
+                </div>
              </div>
           </CardContent>
        </Card>
