@@ -22,7 +22,25 @@ export interface UserProfile {
 export interface Category {
   id?: string;
   name: string;
-  color?: string;
+  color: string;
+}
+
+export interface ModifierOption {
+  name: string;
+  price: number;
+}
+
+export interface ModifierGroup {
+  id?: string;
+  name: string;
+  options: ModifierOption[];
+}
+
+export interface Discount {
+  id?: string;
+  name: string;
+  value: number;
+  type: DiscountType;
 }
 
 export interface Location {
@@ -42,7 +60,7 @@ export interface MenuItem {
   id?: string;
   name: string;
   price: number;
-  cost?: number;
+  cost: number;
   category: string;
   categoryId?: string;
   image?: string;
@@ -51,9 +69,9 @@ export interface MenuItem {
   barcode?: string;
   trackInventory: boolean;
   inventoryCount?: number;
-  tpvColor?: string;
-  tpvShape?: TpvShape;
-  modifiers?: string[]; // Ejemplo: ["Sin cebolla", "Extra queso"]
+  tpvColor: string;
+  tpvShape: TpvShape;
+  modifierIds: string[]; // IDs de ModifierGroup
 }
 
 export interface OrderItem {
@@ -62,7 +80,7 @@ export interface OrderItem {
   name: string;
   quantity: number;
   priceAtOrder: number;
-  selectedModifiers: string[];
+  selectedModifiers: { name: string; price: number }[];
   notes?: string;
 }
 
