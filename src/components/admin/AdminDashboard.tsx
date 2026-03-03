@@ -114,17 +114,16 @@ export default function AdminDashboard() {
       <main className="flex-1 p-8">
         <Tabs defaultValue="menu" className="space-y-6 max-w-7xl mx-auto">
           <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem]">
-            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Gestión de Menú</TabsTrigger>
+            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
             <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
             <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           </TabsList>
 
           <TabsContent value="menu" className="space-y-12">
-            {/* UNIFIED MENU MANAGEMENT TAB */}
             <section className="space-y-6">
               <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                 <Package className="h-6 w-6 text-primary" />
-                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Artículos y Platillos</h2>
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Gestión de Menú</h2>
               </div>
               <ArticulosManager items={items || []} categories={categories || []} modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
             </section>
@@ -750,7 +749,6 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-       {/* Sedes y Sucursales */}
        <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
           <CardHeader className="bg-muted/30 border-b">
              <div className="flex justify-between items-center">
@@ -791,7 +789,6 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
           </CardContent>
        </Card>
 
-       {/* Finanzas y Operación */}
        <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
           <CardHeader className="bg-muted/30 border-b"><CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><CreditCard className="h-5 w-5" /> Finanzas</CardTitle></CardHeader>
           <CardContent className="p-8 space-y-4">
@@ -827,7 +824,6 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
           </CardContent>
        </Card>
 
-       {/* Personalización Ticket */}
        <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
           <CardHeader className="bg-muted/30 border-b"><CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><Receipt className="h-5 w-5" /> Ticket POS</CardTitle></CardHeader>
           <CardContent className="p-8 space-y-4">
