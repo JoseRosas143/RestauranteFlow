@@ -114,7 +114,7 @@ export default function AdminDashboard() {
       <main className="flex-1 p-8">
         <Tabs defaultValue="menu" className="space-y-6 max-w-7xl mx-auto">
           <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem]">
-            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Gestión de Menú</TabsTrigger>
+            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
             <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
             <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           </TabsList>
@@ -808,7 +808,9 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
                    <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
                       {form.logo ? <img src={form.logo} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
                    </div>
-                   <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-[8px] font-black rounded-xl" />
+                   <div className="flex-1">
+                    <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-[8px] font-black rounded-xl file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[8px] file:font-black file:bg-primary file:text-white" />
+                   </div>
                 </div>
              </div>
              <div className="space-y-1">
@@ -826,6 +828,7 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
                 <Label className="text-[10px] font-black uppercase">Pie de Página / Comentarios</Label>
                 <Textarea value={form.ticketFooter || ''} onChange={e => setForm({...form, ticketFooter: e.target.value})} className="min-h-[80px] rounded-xl text-xs" />
              </div>
+             <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={save} disabled={loading}>GUARDAR TICKET</Button>
           </CardContent>
        </Card>
     </div>
