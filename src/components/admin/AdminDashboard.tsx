@@ -25,6 +25,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
 import { useRouter } from 'next/navigation';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
@@ -192,44 +194,61 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
     }
   };
 
-  const save = async () => {
+  const save = () => {
     if (!form.name || !form.category) {
       toast({ variant: 'destructive', title: 'Faltan datos', description: 'Nombre y categoría obligatorios.' });
       return;
     }
     setLoading(true);
-    try {
-      const cleanData = {
-        name: form.name || '',
-        price: Number(form.price) || 0,
-        cost: Number(form.cost) || 0,
-        category: form.category || '',
-        reference: form.reference || '',
-        barcode: form.barcode || '',
-        soldBy: form.soldBy || 'unidad',
-        trackInventory: !!form.trackInventory,
-        inventoryCount: Number(form.inventoryCount) || 0,
-        tpvColor: form.tpvColor || '#B8732E',
-        tpvShape: form.tpvShape || 'cuadrado',
-        modifierIds: form.modifierIds || [],
-        image: form.image || '',
-        updatedAt: Date.now()
-      };
+    const cleanData = {
+      name: form.name || '',
+      price: Number(form.price) || 0,
+      cost: Number(form.cost) || 0,
+      category: form.category || '',
+      reference: form.reference || '',
+      barcode: form.barcode || '',
+      soldBy: form.soldBy || 'unidad',
+      trackInventory: !!form.trackInventory,
+      inventoryCount: Number(form.inventoryCount) || 0,
+      tpvColor: form.tpvColor || '#B8732E',
+      tpvShape: form.tpvShape || 'cuadrado',
+      modifierIds: form.modifierIds || [],
+      image: form.image || '',
+      updatedAt: Date.now()
+    };
 
-      const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
-      if (editingId) {
-        await updateDoc(doc(colRef, editingId), cleanData);
-        toast({ title: "Artículo actualizado" });
-      } else {
-        await addDoc(colRef, { ...cleanData, createdAt: Date.now() });
-        toast({ title: "Artículo creado" });
-      }
-      setForm(initialState);
-      setEditingId(null);
-    } catch (e) { 
-      toast({ variant: 'destructive', title: "Error al guardar" }); 
-    } finally { 
-      setLoading(false); 
+    const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'menuItems');
+    
+    if (editingId) {
+      const docRef = doc(colRef, editingId);
+      updateDoc(docRef, cleanData)
+        .then(() => {
+          toast({ title: "Artículo actualizado" });
+          setForm(initialState);
+          setEditingId(null);
+        })
+        .catch(async (error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: cleanData
+          }));
+        })
+        .finally(() => setLoading(false));
+    } else {
+      addDoc(colRef, { ...cleanData, createdAt: Date.now() })
+        .then(() => {
+          toast({ title: "Artículo creado" });
+          setForm(initialState);
+        })
+        .catch(async (error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: colRef.path,
+            operation: 'create',
+            requestResourceData: cleanData
+          }));
+        })
+        .finally(() => setLoading(false));
     }
   };
 
@@ -369,7 +388,12 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
               </div>
               <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={() => {setForm(item); setEditingId(item.id!);}}><Edit2 className="h-3 w-3" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-full hover:bg-destructive/10" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'menuItems', item.id!))}><Trash2 className="h-3 w-3" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-full hover:bg-destructive/10" onClick={() => {
+                   const docRef = doc(db, 'orgs', orgId, 'locations', locId, 'menuItems', item.id!);
+                   deleteDoc(docRef).catch(async () => {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+                   });
+                }}><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
           </Card>
@@ -384,13 +408,17 @@ function CategoriasManager({ categories, items, orgId, locId }: { categories: Ca
   const { toast } = useToast();
   const [form, setForm] = useState({ name: '', color: '#B8732E' });
 
-  const save = async () => {
+  const save = () => {
     if (!form.name) return;
-    try {
-      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'categories'), { ...form, updatedAt: Date.now() });
-      setForm({ name: '', color: '#B8732E' });
-      toast({ title: "Categoría creada" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error" }); }
+    const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'categories');
+    addDoc(colRef, { ...form, updatedAt: Date.now() })
+      .then(() => {
+        setForm({ name: '', color: '#B8732E' });
+        toast({ title: "Categoría creada" });
+      })
+      .catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: form }));
+      });
   };
 
   return (
@@ -417,7 +445,12 @@ function CategoriasManager({ categories, items, orgId, locId }: { categories: Ca
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
                   <span className="font-black uppercase text-xs italic tracking-tighter">{cat.name}</span>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'categories', cat.id!))}><Trash2 className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => {
+                   const docRef = doc(db, 'orgs', orgId, 'locations', locId, 'categories', cat.id!);
+                   deleteDoc(docRef).catch(async () => {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+                   });
+                }}><Trash2 className="h-4 w-4" /></Button>
               </div>
             ))}
           </div>
@@ -443,26 +476,37 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
     setOptName(''); setOptPrice(0);
   };
 
-  const save = async () => {
+  const save = () => {
     if (!name || options.length === 0) {
       toast({ variant: 'destructive', title: 'Datos incompletos' });
       return;
     }
     setLoading(true);
-    try {
-      const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'modifiers');
-      const cleanData = { name, options, updatedAt: Date.now() };
+    const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'modifiers');
+    const cleanData = { name, options, updatedAt: Date.now() };
 
-      if (editingId) {
-        await updateDoc(doc(colRef, editingId), cleanData);
-        toast({ title: "Modificador actualizado" });
-      } else {
-        await addDoc(colRef, { ...cleanData, createdAt: Date.now() });
-        toast({ title: "Modificador creado" });
-      }
-      setName(''); setOptions([]); setEditingId(null);
-    } catch (e) { toast({ variant: 'destructive' }); }
-    finally { setLoading(false); }
+    if (editingId) {
+      const docRef = doc(colRef, editingId);
+      updateDoc(docRef, cleanData)
+        .then(() => {
+          toast({ title: "Modificador actualizado" });
+          setName(''); setOptions([]); setEditingId(null);
+        })
+        .catch(async () => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: cleanData }));
+        })
+        .finally(() => setLoading(false));
+    } else {
+      addDoc(colRef, { ...cleanData, createdAt: Date.now() })
+        .then(() => {
+          toast({ title: "Modificador creado" });
+          setName(''); setOptions([]);
+        })
+        .catch(async () => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: cleanData }));
+        })
+        .finally(() => setLoading(false));
+    }
   };
 
   return (
@@ -494,7 +538,12 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setEditingId(m.id!); setName(m.name); setOptions(m.options);}}><Edit2 className="h-3 w-3" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'modifiers', m.id!))}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => {
+                     const docRef = doc(db, 'orgs', orgId, 'locations', locId, 'modifiers', m.id!);
+                     deleteDoc(docRef).catch(async () => {
+                       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+                     });
+                  }}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
             ))}
@@ -510,13 +559,17 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
   const { toast } = useToast();
   const [form, setForm] = useState<Partial<Discount>>({ name: '', value: 0, type: 'porcentaje' });
 
-  const save = async () => {
+  const save = () => {
     if (!form.name || !form.value) return;
-    try {
-      await addDoc(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), { ...form, updatedAt: Date.now() });
-      setForm({ name: '', value: 0, type: 'porcentaje' });
-      toast({ title: "Descuento activado" });
-    } catch (e) { toast({ variant: 'destructive' }); }
+    const colRef = collection(db, 'orgs', orgId, 'locations', locId, 'discounts');
+    addDoc(colRef, { ...form, updatedAt: Date.now() })
+      .then(() => {
+        setForm({ name: '', value: 0, type: 'porcentaje' });
+        toast({ title: "Descuento activado" });
+      })
+      .catch(async () => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: form }));
+      });
   };
 
   return (
@@ -548,7 +601,12 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
       </Card>
       {discounts.map(d => (
         <Card key={d.id} className="bg-white border-2 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 group relative shadow-sm h-[180px]">
-          <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'locations', locId, 'discounts', d.id!))}>
+          <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => {
+             const docRef = doc(db, 'orgs', orgId, 'locations', locId, 'discounts', d.id!);
+             deleteDoc(docRef).catch(async () => {
+               errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+             });
+          }}>
             <Trash2 className="h-4 w-4" />
           </Button>
           <h5 className="font-black uppercase italic text-xs tracking-tighter text-muted-foreground">{d.name}</h5>
@@ -569,34 +627,46 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
   const initialStaffState: Partial<UserProfile> = { name: '', email: '', role: 'cashier', pin: '', allowedLocIds: [locId] };
   const [newUser, setNewUser] = useState<Partial<UserProfile>>(initialStaffState);
 
-  const saveStaffUser = async () => {
+  const saveStaffUser = () => {
     if (!newUser.name || !newUser.email || !newUser.pin) {
       toast({ variant: 'destructive', title: 'Faltan datos' });
       return;
     }
     setLoading(true);
-    try {
-      const path = collection(db, 'orgs', orgId, 'users');
-      const cleanData = {
-        name: newUser.name || '',
-        email: newUser.email || '',
-        role: newUser.role || 'cashier',
-        pin: newUser.pin || '',
-        allowedLocIds: newUser.allowedLocIds || [locId],
-        orgId,
-        updatedAt: Date.now()
-      };
+    const path = collection(db, 'orgs', orgId, 'users');
+    const cleanData = {
+      name: newUser.name || '',
+      email: newUser.email || '',
+      role: newUser.role || 'cashier',
+      pin: newUser.pin || '',
+      allowedLocIds: newUser.allowedLocIds || [locId],
+      orgId,
+      updatedAt: Date.now()
+    };
 
-      if (editingId) {
-        await updateDoc(doc(path, editingId), cleanData);
-      } else {
-        await addDoc(path, { ...cleanData, uid: `STAFF-${Date.now()}`, createdAt: Date.now() });
-      }
-      setNewUser(initialStaffState);
-      setEditingId(null);
-      toast({ title: "Equipo actualizado" });
-    } catch (e) { toast({ variant: 'destructive' }); }
-    finally { setLoading(false); }
+    if (editingId) {
+      const docRef = doc(path, editingId);
+      updateDoc(docRef, cleanData)
+        .then(() => {
+          setNewUser(initialStaffState);
+          setEditingId(null);
+          toast({ title: "Equipo actualizado" });
+        })
+        .catch(async () => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: cleanData }));
+        })
+        .finally(() => setLoading(false));
+    } else {
+      addDoc(path, { ...cleanData, uid: `STAFF-${Date.now()}`, createdAt: Date.now() })
+        .then(() => {
+          setNewUser(initialStaffState);
+          toast({ title: "Personal añadido" });
+        })
+        .catch(async () => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: path.path, operation: 'create', requestResourceData: cleanData }));
+        })
+        .finally(() => setLoading(false));
+    }
   };
 
   return (
@@ -651,7 +721,12 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
                        </div>
                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button variant="ghost" size="icon" className="rounded-full" onClick={() => {setNewUser(u); setEditingId(u.id!);}}><Edit2 className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="text-destructive rounded-full" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'users', u.id!))}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive rounded-full" onClick={() => {
+                             const docRef = doc(db, 'orgs', orgId, 'users', u.id!);
+                             deleteDoc(docRef).catch(async () => {
+                               errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+                             });
+                          }}><Trash2 className="h-4 w-4" /></Button>
                        </div>
                     </div>
                  ))}
@@ -706,31 +781,39 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
     }
   };
 
-  const save = async () => {
+  const save = () => {
     if (!locId) return;
     setLoading(true);
-    try {
-      await updateDoc(doc(db, 'orgs', orgId, 'locations', locId), { ...form, updatedAt: Date.now() });
-      toast({ title: "Configuración actualizada" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error al guardar" }); }
-    finally { setLoading(false); }
+    const docRef = doc(db, 'orgs', orgId, 'locations', locId);
+    updateDoc(docRef, { ...form, updatedAt: Date.now() })
+      .then(() => {
+        toast({ title: "Configuración actualizada" });
+      })
+      .catch(async () => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: form }));
+      })
+      .finally(() => setLoading(false));
   };
 
   const createNewLocation = async () => {
     const name = prompt("Nombre de la nueva sucursal:");
     if (!name) return;
-    try {
-      const newLocRef = await addDoc(collection(db, 'orgs', orgId, 'locations'), {
-        name,
-        createdAt: Date.now(),
-        taxRate: 0,
-        cardFee: 0,
-        address: '',
-        phoneNumber: ''
+    const colRef = collection(db, 'orgs', orgId, 'locations');
+    addDoc(colRef, {
+      name,
+      createdAt: Date.now(),
+      taxRate: 0,
+      cardFee: 0,
+      address: '',
+      phoneNumber: ''
+    })
+      .then(() => {
+        toast({ title: "Sucursal creada" });
+        fetchLocations();
+      })
+      .catch(async () => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create' }));
       });
-      toast({ title: "Sucursal creada" });
-      fetchLocations();
-    } catch (e) { toast({ variant: 'destructive' }); }
   };
 
   const deleteLocation = async (id: string, name: string) => {
@@ -740,11 +823,15 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
     }
     if (!confirm(`¿Estás seguro de eliminar la sucursal "${name}"? Esta acción no se puede deshacer.`)) return;
     
-    try {
-      await deleteDoc(doc(db, 'orgs', orgId, 'locations', id));
-      toast({ title: "Sucursal eliminada" });
-      fetchLocations();
-    } catch (e) { toast({ variant: 'destructive' }); }
+    const docRef = doc(db, 'orgs', orgId, 'locations', id);
+    deleteDoc(docRef)
+      .then(() => {
+        toast({ title: "Sucursal eliminada" });
+        fetchLocations();
+      })
+      .catch(async () => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+      });
   };
 
   return (
@@ -763,24 +850,26 @@ function ConfigManager({ location, orgId, locId }: { location?: Location, orgId:
                       <div key={l.id} className="group relative">
                         <Button 
                           variant={l.id === locId ? 'default' : 'outline'} 
-                          className="w-full h-16 justify-between rounded-xl px-4 border-2 pr-12"
+                          className="w-full h-16 justify-between rounded-xl px-4 border-2 pr-12 overflow-hidden"
                           onClick={() => setLoc(l)}
                         >
                           <div className="text-left">
-                             <div className="font-black text-xs uppercase">{l.name}</div>
-                             <div className="text-[8px] font-bold opacity-60 truncate max-w-[150px]">{l.address || 'Ubicación central'}</div>
+                             <div className="font-black text-xs uppercase truncate max-w-[120px]">{l.name}</div>
+                             <div className="text-[8px] font-bold opacity-60 truncate max-w-[120px]">{l.address || 'Ubicación central'}</div>
                           </div>
                           {l.id === locId && <Badge className="bg-white text-primary text-[8px] font-black">ACTIVA</Badge>}
                         </Button>
                         {l.id !== locId && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => { e.stopPropagation(); deleteLocation(l.id, l.name); }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-full"
+                              onClick={(e) => { e.stopPropagation(); deleteLocation(l.id, l.name); }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                    ))}
