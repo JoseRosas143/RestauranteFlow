@@ -818,14 +818,18 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
       toast({ variant: 'destructive', title: 'Acción bloqueada', description: 'No puedes eliminar la sucursal activa.' });
       return;
     }
-    if (!confirm(`¿Estás seguro de eliminar la sucursal "${name}"? Esta acción no se puede deshacer.`)) return;
     
+    // Usamos un sistema de confirmación más robusto para debug
+    const confirmDelete = window.confirm(`¿Está seguro de que desea eliminar la sucursal "${name}"?`);
+    if (!confirmDelete) return;
+
     const docRef = doc(db, 'orgs', orgId, 'locations', id);
     deleteDoc(docRef)
       .then(() => {
-        toast({ title: "Sucursal eliminada" });
+        toast({ title: "Sede eliminada con éxito" });
       })
-      .catch(async () => {
+      .catch(async (error) => {
+        console.error("Error deleting location:", error);
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
       });
   };
@@ -843,10 +847,10 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
              <ScrollArea className="h-[300px] pr-2">
                 <div className="space-y-2">
                    {allLocations.map(l => (
-                      <div key={l.id} className="group relative">
+                      <div key={l.id} className="group relative flex items-center gap-2">
                         <Button 
                           variant={l.id === locId ? 'default' : 'outline'} 
-                          className="w-full h-16 justify-between rounded-xl px-4 border-2 pr-12 overflow-hidden"
+                          className="flex-1 h-16 justify-between rounded-xl px-4 border-2 overflow-hidden"
                           onClick={() => setLoc(l)}
                         >
                           <div className="text-left">
@@ -855,21 +859,20 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
                           </div>
                           {l.id === locId && <Badge className="bg-white text-primary text-[8px] font-black">ACTIVA</Badge>}
                         </Button>
+                        
                         {l.id !== locId && (
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
-                            <Button 
+                           <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-full"
+                              className="h-12 w-12 text-destructive hover:bg-destructive/10 rounded-xl shrink-0"
                               onClick={(e) => { 
                                 e.stopPropagation(); 
                                 e.preventDefault();
                                 deleteLocation(l.id, l.name); 
                               }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                           >
+                              <Trash2 className="h-5 w-5" />
+                           </Button>
                         )}
                       </div>
                    ))}
@@ -948,3 +951,4 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
     </div>
   );
 }
+
