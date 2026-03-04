@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,7 +19,7 @@ import {
   Plus, Trash2, Package, Loader2, Edit2, 
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
   Tag, ImageIcon, Receipt, Save, 
-  Layers, Sliders, Percent, Barcode, Box, Building2, ShieldCheck, Lock, Eraser, MapPin, Phone, Globe, CreditCard
+  Layers, Sliders, Percent, Barcode, Box, Building2, ShieldCheck, Lock, Eraser, MapPin, Phone, Globe, CreditCard, AlignLeft, AlignJustify
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
@@ -1007,6 +1008,24 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                    <Input value={form.websiteUrl || ''} onChange={e => setForm({...form, websiteUrl: e.target.value})} placeholder="https://miweb.com" className="h-12 pl-12 rounded-xl" />
                 </div>
+             </div>
+             <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><AlignLeft className="h-3 w-3" /> Encabezado del Ticket</Label>
+                <Textarea 
+                  value={form.ticketHeader || ''} 
+                  onChange={e => setForm({...form, ticketHeader: e.target.value})} 
+                  placeholder="Ej: ¡Bienvenidos! Gracias por su visita."
+                  className="rounded-xl bg-muted/20 border-0 focus-visible:ring-primary min-h-[80px]"
+                />
+             </div>
+             <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><AlignJustify className="h-3 w-3" /> Pie de página del Ticket</Label>
+                <Textarea 
+                  value={form.ticketFooter || ''} 
+                  onChange={e => setForm({...form, ticketFooter: e.target.value})} 
+                  placeholder="Ej: Favor de conservar su ticket para cualquier aclaración."
+                  className="rounded-xl bg-muted/20 border-0 focus-visible:ring-primary min-h-[80px]"
+                />
              </div>
              <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={saveConfig} disabled={loading}>
                {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR TICKET

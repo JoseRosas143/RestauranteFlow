@@ -2,24 +2,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Regla global definitiva para desarrollo: 
-    // Cualquier usuario autenticado tiene permiso total sobre cualquier documento o colección.
-    // Se utiliza una estructura más explícita para asegurar que la recursividad (**) 
-    // funcione correctamente en todas las profundidades de la jerarquía orgs/locations/orders.
-    
+    // Regla simplificada para desarrollo: permite todo a usuarios autenticados
     match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-
-    // Reglas de respaldo específicas para rutas críticas
-    match /orgs/{orgId} {
-      allow read, write: if request.auth != null;
-      match /{allSubcollections=**} {
-        allow read, write: if request.auth != null;
-      }
-    }
-
-    match /users/{userId} {
       allow read, write: if request.auth != null;
     }
   }
