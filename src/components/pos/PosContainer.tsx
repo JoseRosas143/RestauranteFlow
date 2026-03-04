@@ -42,7 +42,7 @@ export default function PosContainer() {
   const modsQuery = useMemoFirebase(() => orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'modifiers'), orderBy('name', 'asc')) : null, [db, orgId, locId]);
   const discountsQuery = useMemoFirebase(() => orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), orderBy('name', 'asc')) : null, [db, orgId, locId]);
   const staffQuery = useMemoFirebase(() => orgId ? collection(db, 'orgs', orgId, 'users') : null, [db, orgId]);
-  const openOrdersQuery = useMemoFirebase(() => orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'orders'), where('status', '!=', 'paid'), orderBy('status'), orderBy('createdAt', 'desc')) : null, [db, orgId, locId]);
+  const openOrdersQuery = useMemoFirebase(() => orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'orders'), where('status', '!=', 'paid'), orderBy('status')) : null, [db, orgId, locId]);
   const locRef = useMemoFirebase(() => orgId && locId ? doc(db, 'orgs', orgId, 'locations', locId) : null, [db, orgId, locId]);
   
   const { data: menuItems, isLoading: menuLoading } = useCollection<MenuItem>(menuQuery);
@@ -118,7 +118,7 @@ export default function PosContainer() {
   const updateOrderTotals = (items: OrderItem[], discount: number = 0, dType: DiscountType = 'porcentaje') => {
     const subtotal = items.reduce((acc, i) => {
       const itemBase = i.priceAtOrder * i.quantity;
-      const modsTotal = i.selectedModifiers.reduce((mAcc, m) => mAcc + (m.price * i.quantity), 0);
+      const modsTotal = (i.selectedModifiers || []).reduce((mAcc, m) => mAcc + (m.price * i.quantity), 0);
       return acc + itemBase + modsTotal;
     }, 0);
 
@@ -261,8 +261,15 @@ export default function PosContainer() {
   };
 
   // Filtrar los modificadores disponibles para el item que se está editando
-  const currentItemInMenu = menuItems?.find(mi => mi.id === modifyingItem?.item.menuItemId);
-  const availableModifiers = allModifiers?.filter(m => currentItemInMenu?.modifierIds?.includes(m.id!)) || [];
+  const currentItemInMenu = useMemo(() => {
+    if (!modifyingItem) return null;
+    return menuItems?.find(mi => mi.id === modifyingItem.item.menuItemId);
+  }, [modifyingItem, menuItems]);
+
+  const availableModifiers = useMemo(() => {
+    if (!currentItemInMenu || !allModifiers) return [];
+    return allModifiers.filter(m => currentItemInMenu.modifierIds?.includes(m.id!));
+  }, [currentItemInMenu, allModifiers]);
 
   if (isLocked) {
     return (
