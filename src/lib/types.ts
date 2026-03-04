@@ -42,6 +42,18 @@ export interface Discount {
   type: DiscountType;
 }
 
+export interface Customer {
+  id?: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  points: number;
+  visits: number;
+  lastVisit: number;
+  createdAt: number;
+}
+
 export interface Location {
   id: string;
   name: string;
@@ -53,26 +65,9 @@ export interface Location {
   websiteUrl?: string;
   ticketHeader?: string;
   ticketFooter?: string;
+  loyaltyPointsPercentage?: number;
   createdAt: number;
   updatedAt?: number;
-}
-
-export interface MenuItem {
-  id?: string;
-  name: string;
-  price: number;
-  cost: number;
-  category: string;
-  categoryId?: string;
-  image?: string;
-  soldBy: SoldBy;
-  reference?: string;
-  barcode?: string;
-  trackInventory: boolean;
-  inventoryCount?: number;
-  tpvColor: string;
-  tpvShape: TpvShape;
-  modifierIds: string[];
 }
 
 export interface OrderItem {
@@ -108,6 +103,7 @@ export interface Order {
   paidAmount: number;
   serviceType: ServiceType;
   tableNumber?: string;
+  customerId?: string;
   customerName?: string;
   customerPhone?: string;
   notes?: string;
@@ -117,6 +113,7 @@ export interface Order {
   orgId: string;
   staffId?: string;
   staffName?: string;
+  pointsEarned?: number;
 }
 
 export interface KitchenTicket {

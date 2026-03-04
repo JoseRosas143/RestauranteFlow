@@ -17,11 +17,11 @@ import { signOut } from 'firebase/auth';
 import { 
   Plus, Trash2, Package, Loader2, Edit2, 
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
-  Tag, ImageIcon, Receipt, Save, 
-  Layers, Sliders, Percent, Barcode, Box, Building2, ShieldCheck, Lock, Eraser, MapPin, Phone, Globe, CreditCard, AlignLeft, AlignJustify
+  Tag, ImageIcon, Receipt, Save, Gift,
+  Layers, Sliders, Percent, Barcode, Box, Building2, ShieldCheck, Lock, Eraser, MapPin, Phone, Globe, CreditCard, AlignLeft, AlignJustify, UserCircle, Search, Mail, Map
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
+import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount, Customer } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -61,6 +61,11 @@ export default function AdminDashboard() {
     [db, orgId]
   );
   
+  const customersQuery = useMemoFirebase(() => 
+    orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, 
+    [db, orgId]
+  );
+
   const locationDocRef = useMemoFirebase(() => 
     orgId && locId ? doc(db, 'orgs', orgId, 'locations', locId) : null, 
     [db, orgId, locId]
@@ -76,6 +81,7 @@ export default function AdminDashboard() {
   const { data: modifiers } = useCollection<ModifierGroup>(modifiersQuery);
   const { data: discounts } = useCollection<Discount>(discountsQuery);
   const { data: staffUsers } = useCollection<UserProfile>(usersQuery);
+  const { data: customers } = useCollection<Customer>(customersQuery);
   const { data: currentLocationData } = useDoc<Location>(locationDocRef);
   const { data: allLocations } = useCollection<Location>(locationsQuery);
 
@@ -147,6 +153,7 @@ export default function AdminDashboard() {
           <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem]">
             <TabsTrigger value="articulos" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
             <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
+            <TabsTrigger value="clientes" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><UserCircle className="h-4 w-4" /> Clientes</TabsTrigger>
             <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           </TabsList>
 
@@ -202,6 +209,10 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
             <StaffManager staff={staffUsers || []} orgId={orgId!} locId={locId!} locationName={currentLocationData?.name || 'Sucursal Principal'} />
+          </TabsContent>
+
+          <TabsContent value="clientes">
+            <CustomersManager customers={customers || []} orgId={orgId!} />
           </TabsContent>
 
           <TabsContent value="config">
@@ -832,13 +843,103 @@ function StaffManager({ staff, orgId, locId, locationName }: { staff: UserProfil
   );
 }
 
+function CustomersManager({ customers, orgId }: { customers: Customer[], orgId: string }) {
+  const db = useFirestore();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const initialState: Partial<Customer> = { name: '', email: '', phone: '', address: '', points: 0, visits: 0 };
+  const [form, setForm] = useState<Partial<Customer>>(initialState);
+
+  const saveCustomer = () => {
+    if (!form.name || !form.phone) {
+      toast({ variant: 'destructive', title: 'Faltan datos', description: 'Nombre y teléfono son obligatorios.' });
+      return;
+    }
+    setLoading(true);
+    const colRef = collection(db, 'orgs', orgId, 'customers');
+    const cleanData = {
+      name: form.name,
+      email: form.email || '',
+      phone: form.phone,
+      address: form.address || '',
+      points: Number(form.points) || 0,
+      visits: Number(form.visits) || 0,
+      lastVisit: form.lastVisit || Date.now(),
+      updatedAt: Date.now()
+    };
+
+    if (editingId) {
+      updateDoc(doc(colRef, editingId), cleanData)
+        .then(() => { toast({ title: "Cliente actualizado" }); setForm(initialState); setEditingId(null); })
+        .catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `orgs/${orgId}/customers/${editingId}`, operation: 'update' })))
+        .finally(() => setLoading(false));
+    } else {
+      addDoc(colRef, { ...cleanData, createdAt: Date.now() })
+        .then(() => { toast({ title: "Cliente registrado" }); setForm(initialState); })
+        .catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `orgs/${orgId}/customers`, operation: 'create' })))
+        .finally(() => setLoading(false));
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <Card className="lg:col-span-1 rounded-[2rem] border-2 border-t-8 border-t-accent shadow-xl h-fit">
+        <CardHeader><CardTitle className="font-black uppercase italic text-2xl">{editingId ? 'EDITAR CLIENTE' : 'NUEVO CLIENTE'}</CardTitle></CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nombre Completo</Label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="h-12 rounded-xl" /></div>
+          <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Teléfono</Label><Input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="h-12 rounded-xl" /></div>
+          <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Email</Label><Input value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="h-12 rounded-xl" /></div>
+          <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Dirección (Ciudad, Estado)</Label><Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="h-12 rounded-xl" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Puntos</Label><Input type="number" value={form.points} onChange={e => setForm({...form, points: Number(e.target.value)})} className="h-12 rounded-xl" /></div>
+            <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Visitas</Label><Input type="number" value={form.visits} onChange={e => setForm({...form, visits: Number(e.target.value)})} className="h-12 rounded-xl" /></div>
+          </div>
+          <Button className="w-full h-16 bg-accent hover:bg-accent/90 font-black text-xl rounded-2xl" onClick={saveCustomer} disabled={loading}>
+            {loading ? <Loader2 className="animate-spin" /> : 'GUARDAR CLIENTE'}
+          </Button>
+          {editingId && <Button variant="ghost" className="w-full font-bold text-[10px] uppercase" onClick={() => {setEditingId(null); setForm(initialState);}}>Cancelar</Button>}
+        </CardContent>
+      </Card>
+      <div className="lg:col-span-2 space-y-4">
+        <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input placeholder="Buscar clientes..." className="h-14 pl-12 rounded-2xl border-2" /></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {customers.map(c => (
+            <Card key={c.id} className="rounded-2xl border-2 hover:border-accent transition-all group overflow-hidden bg-white">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center border-2 border-accent/20"><UserCircle className="h-8 w-8 text-accent" /></div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-black text-lg uppercase italic tracking-tighter truncate">{c.name}</h4>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase"><Mail className="h-3 w-3" /> {c.email || '---'}</div>
+                  </div>
+                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => {setForm(c); setEditingId(c.id!);}}><Edit2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-full" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'customers', c.id!))}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-muted/30 p-2 rounded-xl text-center"><p className="text-[8px] font-black uppercase text-muted-foreground">Puntos</p><p className="font-black text-accent">{c.points.toFixed(2)}</p></div>
+                  <div className="bg-muted/30 p-2 rounded-xl text-center"><p className="text-[8px] font-black uppercase text-muted-foreground">Visitas</p><p className="font-black text-accent">{c.visits}</p></div>
+                  <div className="bg-muted/30 p-2 rounded-xl text-center"><p className="text-[8px] font-black uppercase text-muted-foreground">Celular</p><p className="font-black text-[10px] truncate">{c.phone}</p></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConfigManager({ location, orgId, locId, allLocations }: { location?: Location, orgId: string, locId: string, allLocations: Location[] }) {
   const db = useFirestore();
   const { setLoc } = useTenant();
   const { toast } = useToast();
   const [form, setForm] = useState<Partial<Location>>({ 
     name: '', address: '', phoneNumber: '', taxRate: 0, cardFee: 0, 
-    logo: '', websiteUrl: '', ticketHeader: '', ticketFooter: '' 
+    logo: '', websiteUrl: '', ticketHeader: '', ticketFooter: '',
+    loyaltyPointsPercentage: 0
   });
   const [loading, setLoading] = useState(false);
 
@@ -853,7 +954,8 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
         logo: location.logo || '',
         websiteUrl: location.websiteUrl || '',
         ticketHeader: location.ticketHeader || '',
-        ticketFooter: location.ticketFooter || ''
+        ticketFooter: location.ticketFooter || '',
+        loyaltyPointsPercentage: location.loyaltyPointsPercentage || 0
       });
     }
   }, [location]);
@@ -953,7 +1055,7 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
        </Card>
 
        <Card className="rounded-[2rem] border-2 shadow-xl overflow-hidden h-fit">
-          <CardHeader className="bg-muted/30 border-b"><CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><CreditCard className="h-5 w-5" /> Finanzas</CardTitle></CardHeader>
+          <CardHeader className="bg-muted/30 border-b"><CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><CreditCard className="h-5 w-5" /> Finanzas y Lealtad</CardTitle></CardHeader>
           <CardContent className="p-8 space-y-4">
              <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase">Nombre de Sucursal</Label>
@@ -969,8 +1071,18 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
                    <Input type="number" value={form.cardFee ?? 0} onChange={e => setForm({...form, cardFee: Number(e.target.value)})} className="h-12 rounded-xl" />
                 </div>
              </div>
+             <div className="p-4 bg-primary/5 rounded-2xl border-2 border-primary/20 space-y-2 mt-2">
+                <Label className="text-[10px] font-black uppercase flex items-center gap-2 text-primary"><Gift className="h-4 w-4" /> Configuración Puntos</Label>
+                <div className="space-y-1">
+                   <p className="text-[10px] font-bold text-muted-foreground uppercase leading-tight mb-2">Porcentaje de la compra convertido a puntos (Ej: 5 = 5% del total)</p>
+                   <div className="relative">
+                      <Percent className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                      <Input type="number" value={form.loyaltyPointsPercentage ?? 0} onChange={e => setForm({...form, loyaltyPointsPercentage: Number(e.target.value)})} className="h-12 rounded-xl bg-white pr-12" />
+                   </div>
+                </div>
+             </div>
              <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={saveConfig} disabled={loading}>
-               {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR FINANZAS
+               {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR CAMBIOS
              </Button>
           </CardContent>
        </Card>

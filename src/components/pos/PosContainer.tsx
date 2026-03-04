@@ -1,12 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { MenuItem, Order, OrderItem, UserProfile, Category, ServiceType, DiscountType, ModifierGroup, Discount } from '@/lib/types';
+import { MenuItem, Order, OrderItem, UserProfile, Category, ServiceType, DiscountType, ModifierGroup, Discount, Customer } from '@/lib/types';
 import { 
   Plus, Minus, Trash2, CreditCard, Banknote, X, ShoppingBag, 
   Search, Loader2, KeyRound, LogOut, Tag, Receipt, ChevronRight, 
   Menu, Save, Utensils, Clock, Gift, ArrowRightLeft, Eraser, Trash,
-  Edit3, MessageSquare, Check, Sliders, Smartphone
+  Edit3, MessageSquare, Check, Sliders, Smartphone, UserCircle, Phone, Mail, MapPin, Calendar, Edit2, History
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useTenant, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, doc, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
+import { collection, doc, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, where, increment } from 'firebase/firestore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import LocationSelector from '@/components/tenant/LocationSelector';
 import { Separator } from '@/components/ui/separator';
@@ -42,6 +42,7 @@ export default function PosContainer() {
   const modsQuery = useMemoFirebase(() => orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'modifiers'), orderBy('name', 'asc')) : null, [db, orgId, locId]);
   const discountsQuery = useMemoFirebase(() => orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'discounts'), orderBy('name', 'asc')) : null, [db, orgId, locId]);
   const staffQuery = useMemoFirebase(() => orgId ? collection(db, 'orgs', orgId, 'users') : null, [db, orgId]);
+  const customersQuery = useMemoFirebase(() => orgId ? query(collection(db, 'orgs', orgId, 'customers'), orderBy('name', 'asc')) : null, [db, orgId]);
   const openOrdersQuery = useMemoFirebase(() => orgId && locId ? query(collection(db, 'orgs', orgId, 'locations', locId, 'orders'), where('status', '!=', 'paid'), orderBy('status')) : null, [db, orgId, locId]);
   const locRef = useMemoFirebase(() => orgId && locId ? doc(db, 'orgs', orgId, 'locations', locId) : null, [db, orgId, locId]);
   
@@ -50,6 +51,7 @@ export default function PosContainer() {
   const { data: allModifiers } = useCollection<ModifierGroup>(modsQuery);
   const { data: allDiscounts } = useCollection<Discount>(discountsQuery);
   const { data: staffList } = useCollection<UserProfile>(staffQuery);
+  const { data: allCustomers } = useCollection<Customer>(customersQuery);
   const { data: openOrders } = useCollection<Order>(openOrdersQuery);
   const { data: locationData } = useDoc<any>(locRef);
 
@@ -60,7 +62,11 @@ export default function PosContainer() {
   const [selectedCat, setSelectedCat] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [isTicketsOpen, setIsTicketsOpen] = useState(false);
+  
+  // Loyalty states
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Estados para modificar un item
   const [modifyingItem, setModifyingItem] = useState<{item: OrderItem, index: number} | null>(null);
@@ -114,6 +120,17 @@ export default function PosContainer() {
     if (search) items = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
     return items;
   }, [menuItems, selectedCat, search]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!allCustomers) return [];
+    if (!customerSearch) return allCustomers;
+    const s = customerSearch.toLowerCase();
+    return allCustomers.filter(c => 
+      c.name.toLowerCase().includes(s) || 
+      c.phone.includes(s) || 
+      c.email.toLowerCase().includes(s)
+    );
+  }, [allCustomers, customerSearch]);
 
   const updateOrderTotals = (items: OrderItem[]) => {
     const subtotal = items.reduce((acc, i) => {
@@ -228,6 +245,7 @@ export default function PosContainer() {
 
       toast({ title: "Enviado a Cocina", description: `Pedido ${activeOrder.id} está en preparación.` });
       setActiveOrder(createEmptyOrder());
+      setSelectedCustomer(null);
     } catch (e) { 
       console.error("Error saving order:", e);
       toast({ variant: 'destructive', title: "Error al guardar" }); 
@@ -237,11 +255,16 @@ export default function PosContainer() {
   const completePayment = async (method: 'cash' | 'card' | 'transfer') => {
     if (!activeOrder || activeOrder.items.length === 0) return;
     try {
+      // Calculate points
+      const pointsPerc = (locationData?.loyaltyPointsPercentage || 0) / 100;
+      const pointsEarned = activeOrder.total * pointsPerc;
+
       const orderData = {
         ...activeOrder,
         status: 'paid',
         payments: [{ id: Date.now().toString(), amount: activeOrder.total, method, timestamp: Date.now() }],
         paidAmount: activeOrder.total,
+        pointsEarned: pointsEarned,
         updatedAt: serverTimestamp()
       };
       
@@ -251,8 +274,20 @@ export default function PosContainer() {
         await addDoc(collection(db, 'orgs', orgId!, 'locations', locId!, 'orders'), orderData);
       }
 
+      // Update customer loyalty if assigned
+      if (activeOrder.customerId) {
+        const custRef = doc(db, 'orgs', orgId!, 'customers', activeOrder.customerId);
+        await updateDoc(custRef, {
+          points: increment(pointsEarned),
+          visits: increment(1),
+          lastVisit: Date.now()
+        });
+        toast({ title: `¡Puntos acumulados!`, description: `${activeOrder.customerName} ganó ${pointsEarned.toFixed(2)} puntos.` });
+      }
+
       toast({ title: "Venta Pagada", description: `Pedido ${activeOrder.id} finalizado vía ${method === 'transfer' ? 'Transferencia' : method}.` });
       setActiveOrder(createEmptyOrder());
+      setSelectedCustomer(null);
     } catch (e) { 
         console.error("Error processing payment:", e);
         toast({ variant: 'destructive', title: "Error al procesar pago" }); 
@@ -261,8 +296,24 @@ export default function PosContainer() {
 
   const selectOpenTicket = (order: Order) => {
     setActiveOrder(order);
+    if (order.customerId) {
+       const cust = allCustomers?.find(c => c.id === order.customerId);
+       if (cust) setSelectedCustomer(cust);
+    }
     setIsTicketsOpen(false);
     toast({ title: `Pedido ${order.id} cargado` });
+  };
+
+  const assignCustomerToOrder = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setActiveOrder(prev => prev ? ({
+      ...prev,
+      customerId: customer.id,
+      customerName: customer.name,
+      customerPhone: customer.phone
+    }) : null);
+    setIsLoyaltyOpen(false);
+    toast({ title: "Cliente Asignado", description: customer.name });
   };
 
   const currentItemInMenu = useMemo(() => {
@@ -323,8 +374,13 @@ export default function PosContainer() {
           
           <Button variant="outline" className="h-12 rounded-xl font-black gap-2 border-2" onClick={() => setIsTicketsOpen(true)}>
              <Receipt className="h-5 w-5" /> 
-             <span className="hidden md:inline uppercase text-[10px] tracking-widest">Tickets Abiertos</span>
+             <span className="hidden md:inline uppercase text-[10px] tracking-widest">Tickets</span>
              <Badge className="bg-primary text-white h-5 w-5 flex items-center justify-center p-0 rounded-full">{openOrders?.length || 0}</Badge>
+          </Button>
+
+          <Button variant="outline" className={`h-12 rounded-xl font-black gap-2 border-2 ${selectedCustomer ? 'border-accent text-accent' : ''}`} onClick={() => setIsLoyaltyOpen(true)}>
+             <Gift className="h-5 w-5" />
+             <span className="hidden md:inline uppercase text-[10px] tracking-widest">{selectedCustomer ? selectedCustomer.name.split(' ')[0] : 'Lealtad'}</span>
           </Button>
 
           <LocationSelector />
@@ -368,7 +424,7 @@ export default function PosContainer() {
                <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><Menu className="h-5 w-5" /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-56 rounded-2xl p-2">
-                     <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3" onClick={() => setActiveOrder(createEmptyOrder())}><Eraser className="h-4 w-4" /> Despejar Ticket</DropdownMenuItem>
+                     <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3" onClick={() => { setActiveOrder(createEmptyOrder()); setSelectedCustomer(null); }}><Eraser className="h-4 w-4" /> Despejar Ticket</DropdownMenuItem>
                      <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3" onClick={() => setIsLoyaltyOpen(true)}><Gift className="h-4 w-4" /> Programa Lealtad</DropdownMenuItem>
                      <DropdownMenuSeparator />
                      <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3"><ArrowRightLeft className="h-4 w-4" /> Mover Ticket</DropdownMenuItem>
@@ -376,6 +432,11 @@ export default function PosContainer() {
                   </DropdownMenuContent>
                </DropdownMenu>
             </div>
+            {selectedCustomer && (
+              <Badge variant="outline" className="border-accent text-accent font-black uppercase text-[8px] py-0 px-2 mt-1 gap-1">
+                <Gift className="h-2 w-2" /> CLIENTE: {selectedCustomer.name}
+              </Badge>
+            )}
             <div className="flex items-center gap-2 mt-2">
                <Select value={activeOrder?.tableNumber} onValueChange={v => setActiveOrder(prev => prev ? ({...prev, tableNumber: v}) : null)}>
                   <SelectTrigger className="h-8 w-40 bg-white border-2 rounded-xl text-[10px] font-black uppercase">
@@ -387,7 +448,7 @@ export default function PosContainer() {
                </Select>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="rounded-full text-destructive" onClick={() => setActiveOrder(createEmptyOrder())}><X className="h-6 w-6" /></Button>
+          <Button variant="ghost" size="icon" className="rounded-full text-destructive" onClick={() => { setActiveOrder(createEmptyOrder()); setSelectedCustomer(null); }}><X className="h-6 w-6" /></Button>
         </div>
 
         <ScrollArea className="flex-1 p-6">
@@ -477,6 +538,7 @@ export default function PosContainer() {
         </div>
       </aside>
 
+      {/* Item Modification Dialog */}
       <Dialog open={!!modifyingItem} onOpenChange={(open) => !open && setModifyingItem(null)}>
         <DialogContent className="rounded-[2.5rem] p-8 max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -571,6 +633,106 @@ export default function PosContainer() {
         </DialogContent>
       </Dialog>
 
+      {/* Loyalty / Customer Selection Dialog */}
+      <Dialog open={isLoyaltyOpen} onOpenChange={setIsLoyaltyOpen}>
+        <DialogContent className="rounded-none md:rounded-[2.5rem] p-0 md:p-10 max-w-4xl max-h-screen md:max-h-[90vh] overflow-hidden flex flex-col bg-[#1A1A1A] text-white">
+            <div className="p-6 md:p-0 flex flex-col h-full">
+              <div className="flex justify-between items-center mb-6">
+                <Button variant="ghost" size="icon" className="text-white rounded-full" onClick={() => { setIsLoyaltyOpen(false); setCustomerSearch(''); }}><ArrowLeft className="h-6 w-6" /></Button>
+                <h2 className="text-xl font-black uppercase italic text-center flex-1">Programa de Lealtad</h2>
+                {customerSearch && (
+                  <Button variant="ghost" className="text-primary font-black uppercase text-xs" onClick={() => assignCustomerToOrder(filteredCustomers[0])}>
+                    Añadir al Ticket
+                  </Button>
+                )}
+              </div>
+
+              {!customerSearch ? (
+                <div className="space-y-6 flex-1 overflow-hidden flex flex-col">
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                      placeholder="Buscar por nombre o teléfono..." 
+                      value={customerSearch} 
+                      onChange={e => setCustomerSearch(e.target.value)} 
+                      className="bg-[#2A2A2A] border-0 h-14 rounded-2xl pl-12 text-white font-bold"
+                    />
+                  </div>
+                  <div className="flex-1 flex flex-col items-center justify-center opacity-40">
+                    <UserCircle className="h-24 w-24 mb-4" />
+                    <p className="font-black uppercase tracking-widest text-xs">Busque un cliente para comenzar</p>
+                  </div>
+                </div>
+              ) : (
+                <ScrollArea className="flex-1">
+                  <div className="space-y-4 pb-4">
+                    {filteredCustomers.length > 0 ? (
+                      filteredCustomers.map(cust => (
+                        <div key={cust.id} className="bg-[#2A2A2A] rounded-[2rem] p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                          <div className="flex flex-col items-center text-center space-y-4">
+                            <div className="w-24 h-24 rounded-full bg-[#3A3A3A] flex items-center justify-center border-4 border-[#4A4A4A]">
+                              <UserCircle className="h-14 w-14 text-zinc-500" />
+                            </div>
+                            <h3 className="text-2xl font-black leading-tight uppercase tracking-tighter">{cust.name}</h3>
+                          </div>
+
+                          <div className="space-y-6">
+                            <div className="flex items-center gap-6"><Mail className="h-6 w-6 text-zinc-500" /> <span className="font-bold text-zinc-300">{cust.email || 'Sin correo'}</span></div>
+                            <div className="flex items-center gap-6"><Phone className="h-6 w-6 text-zinc-500" /> <span className="font-bold text-zinc-300">{cust.phone}</span></div>
+                            <div className="flex items-center gap-6"><MapPin className="h-6 w-6 text-zinc-500" /> <span className="font-bold text-zinc-300">{cust.address || 'Puebla, Puebla'}</span></div>
+                          </div>
+
+                          <Separator className="bg-[#3A3A3A]" />
+
+                          <div className="grid grid-cols-1 gap-6">
+                            <div className="flex items-center gap-6">
+                               <Gift className="h-6 w-6 text-zinc-500" />
+                               <div>
+                                  <p className="text-2xl font-black text-white">{cust.points.toFixed(2)}</p>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Puntos Acumulados</p>
+                               </div>
+                            </div>
+                            <div className="flex items-center gap-6">
+                               <ShoppingBag className="h-6 w-6 text-zinc-500" />
+                               <div>
+                                  <p className="text-2xl font-black text-white">{cust.visits}</p>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Visitas Totales</p>
+                               </div>
+                            </div>
+                            <div className="flex items-center gap-6">
+                               <Calendar className="h-6 w-6 text-zinc-500" />
+                               <div>
+                                  <p className="text-lg font-black text-white">{new Date(cust.lastVisit).toLocaleDateString()}</p>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Última Visita</p>
+                               </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-4 pt-6">
+                             <Button variant="ghost" className="justify-start text-primary font-black uppercase text-xs tracking-widest px-0 h-auto hover:bg-transparent" onClick={() => toast({ title: "Editar perfil no disponible en esta demo" })}><Edit2 className="h-4 w-4 mr-3" /> EDITAR PERFIL</Button>
+                             <Button variant="ghost" className="justify-start text-primary font-black uppercase text-xs tracking-widest px-0 h-auto hover:bg-transparent" onClick={() => toast({ title: "Canje de puntos no disponible" })}><Gift className="h-4 w-4 mr-3" /> CANJEAR PUNTOS</Button>
+                             <Button variant="ghost" className="justify-start text-primary font-black uppercase text-xs tracking-widest px-0 h-auto hover:bg-transparent" onClick={() => toast({ title: "Historial de compras no disponible" })}><History className="h-4 w-4 mr-3" /> VER COMPRAS</Button>
+                          </div>
+                          
+                          <Button className="w-full h-16 bg-primary hover:bg-primary/90 font-black text-xl rounded-2xl shadow-2xl mt-4" onClick={() => assignCustomerToOrder(cust)}>
+                            AÑADIR AL TICKET
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-20 opacity-40">
+                        <p className="font-black uppercase italic">No se encontraron clientes</p>
+                        <Button variant="outline" className="mt-4 border-white/20 text-white rounded-xl" onClick={() => { setIsLoyaltyOpen(false); setCustomerSearch(''); router.push('/admin'); }}>Ir a Registrar Cliente</Button>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Open Tickets Dialog */}
       <Dialog open={isTicketsOpen} onOpenChange={setIsTicketsOpen}>
          <DialogContent className="rounded-[2.5rem] p-10 max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
@@ -600,6 +762,7 @@ export default function PosContainer() {
                                 <span className="mx-1">•</span>
                                 <Clock className="h-3 w-3" /> {new Date(order.createdAt).toLocaleTimeString()}
                              </div>
+                             {order.customerName && <Badge variant="outline" className="text-[8px] border-accent text-accent font-black uppercase py-0">{order.customerName}</Badge>}
                           </div>
                           <div className="text-right">
                              <div className="font-black text-2xl">${order.total.toFixed(2)}</div>
