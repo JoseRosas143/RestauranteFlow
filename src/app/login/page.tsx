@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -17,12 +17,18 @@ import { useToast } from '@/hooks/use-toast';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [storeId, setStoreId] = useState('143001'); 
+  const [storeId, setStoreId] = useState(''); 
   const [loading, setLoading] = useState(false);
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const savedOrgId = localStorage.getItem('restauranteFlow_orgId');
+    if (savedOrgId) setStoreId(savedOrgId);
+    else setStoreId('143001'); // Valor por defecto solo si no hay nada guardado
+  }, []);
 
   const syncUserProfile = async (user: any, targetStoreId: string) => {
     try {
@@ -43,7 +49,7 @@ export default function LoginPage() {
           ...profileData,
           firstName: user.displayName?.split(' ')[0] || 'Admin',
           lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
-          pin: '1234', // PIN por defecto para el dueño
+          pin: '1234',
           createdAt: new Date().toISOString(),
         });
       } else {

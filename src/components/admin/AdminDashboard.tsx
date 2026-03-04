@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect } from 'react';
@@ -647,7 +648,7 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
         toast({ title: "Descuento activado" });
       })
       .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: form }));
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: form }));
       });
   };
 
