@@ -6,9 +6,10 @@ import { useTenant, useFirestore } from '@/firebase';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { Location } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { MapPin, Store, ArrowRight, Plus, Loader2 } from 'lucide-react';
+import { MapPin, Store, ArrowRight, Plus, Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function LocationSelector() {
   const { orgId, locId, setLoc, allowedLocs } = useTenant();
@@ -44,65 +45,69 @@ export default function LocationSelector() {
   }, [orgId, allowedLocs, db]);
 
   const createDefaultLocation = async () => {
-    if (!orgId) {
-      toast({ variant: 'destructive', title: "No se encontró el ID de organización" });
-      return;
-    }
+    if (!orgId) return;
     setCreating(true);
     try {
       const locsRef = collection(db, 'orgs', orgId, 'locations');
       const newLoc = {
         name: locations.length === 0 ? 'Sucursal Principal' : `Sucursal ${locations.length + 1}`,
-        address: 'Dirección por configurar',
+        address: '',
         createdAt: Date.now(),
         logo: '',
         phoneNumber: '',
         taxRate: 0
       };
       const docRef = await addDoc(locsRef, newLoc);
-      
       const createdLoc = { id: docRef.id, ...newLoc } as Location;
       setLocations(prev => [...prev, createdLoc]);
       setLoc(createdLoc);
-      
-      toast({ title: "¡Éxito!", description: "Sucursal creada correctamente." });
+      toast({ title: "Sucursal creada" });
     } catch (e: any) {
-      console.error('Error creating location:', e);
-      toast({ 
-        variant: 'destructive', 
-        title: "Error al crear sucursal", 
-        description: e.message || "Verifique los permisos de Firestore." 
-      });
+      toast({ variant: 'destructive', title: "Error", description: e.message });
     } finally {
       setCreating(false);
     }
   };
 
-  // Si no hay orgId, no mostramos nada para evitar el pantallazo blanco,
-  // pero el AdminPage manejará el error visual.
   if (!orgId) return null;
 
+  // Si ya hay una locId, mostramos un selector compacto integrado para la cabecera
   if (locId) {
     const current = locations.find(l => l.id === locId);
     return (
-      <div className="fixed top-4 right-4 z-[60] flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border-2 border-primary/20 shadow-xl group hover:border-primary transition-all">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Store className="h-4 w-4 text-primary" />
-        </div>
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase text-muted-foreground leading-none">Sucursal Activa</span>
-          <span className="text-sm font-black tracking-tight">{current?.name || 'Sincronizando...'}</span>
-        </div>
-        <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] font-black uppercase hover:bg-primary hover:text-white rounded-xl" onClick={() => setLoc(null)}>Cambiar</Button>
+      <div className="flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 px-4 border-2 font-black text-primary gap-2 bg-white rounded-xl shadow-sm">
+              <Store className="h-4 w-4" />
+              <span className="hidden sm:inline uppercase text-[10px] tracking-widest">{current?.name || 'SUCURSAL'}</span>
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2">
+            <div className="px-2 py-1.5 text-[10px] font-black uppercase text-muted-foreground">Cambiar de Sede</div>
+            {locations.map(l => (
+              <DropdownMenuItem key={l.id} className="rounded-xl font-bold uppercase text-[10px] py-3 cursor-pointer" onClick={() => setLoc(l)}>
+                {l.name} {l.id === locId && "✓"}
+              </DropdownMenuItem>
+            ))}
+            <div className="border-t mt-2 pt-2">
+              <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 cursor-pointer text-primary" onClick={createDefaultLocation}>
+                <Plus className="h-3 w-3 mr-2" /> Nueva Sucursal
+              </DropdownMenuItem>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     );
   }
 
+  // Pantalla de selección inicial si no hay locId
   return (
     <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
       <Card className="w-full max-w-lg shadow-2xl border-0 bg-white rounded-[2rem] overflow-hidden">
         <CardHeader className="text-center pt-10 pb-6">
-          <div className="mx-auto w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mb-6 shadow-inner">
+          <div className="mx-auto w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mb-6">
             <MapPin className="h-10 w-10 text-primary" />
           </div>
           <CardTitle className="text-4xl font-black uppercase italic tracking-tighter text-primary leading-none">RestauranteFlow</CardTitle>
@@ -110,48 +115,31 @@ export default function LocationSelector() {
         </CardHeader>
         <CardContent className="p-8 pt-0 space-y-6">
           {loading ? (
-            <div className="text-center py-12 opacity-50 flex flex-col items-center justify-center gap-4">
+            <div className="text-center py-12 flex flex-col items-center gap-4">
               <Loader2 className="animate-spin h-10 w-10 text-primary" />
               <p className="font-black text-xs uppercase tracking-widest">Sincronizando Sedes...</p>
             </div>
           ) : locations.length === 0 ? (
-            <div className="text-center py-8 space-y-6">
-              <p className="text-muted-foreground font-medium">Bienvenido a RestauranteFlow. Para comenzar, cree su primera sucursal física o virtual.</p>
-              <Button onClick={createDefaultLocation} disabled={creating} className="w-full h-16 text-xl font-black shadow-2xl rounded-2xl transition-transform active:scale-95">
-                {creating ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2 h-6 w-6" />}
-                CREAR SUCURSAL INICIAL
-              </Button>
-            </div>
+            <Button onClick={createDefaultLocation} disabled={creating} className="w-full h-16 text-xl font-black rounded-2xl">
+              {creating ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2 h-6 w-6" />}
+              CREAR SUCURSAL INICIAL
+            </Button>
           ) : (
-            <div className="grid gap-4 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="grid gap-4 max-h-[450px] overflow-y-auto pr-2">
               {locations.map((loc) => (
-                <Button 
-                  key={loc.id} 
-                  variant="outline" 
-                  className="h-24 justify-between text-xl font-black hover:border-primary hover:bg-primary/5 transition-all group rounded-2xl border-2 px-6"
-                  onClick={() => setLoc(loc)}
-                >
+                <Button key={loc.id} variant="outline" className="h-24 justify-between font-black rounded-2xl border-2 px-6" onClick={() => setLoc(loc)}>
                   <div className="text-left flex items-center gap-4">
-                    <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                      <Store className="h-6 w-6 text-muted-foreground group-hover:text-primary" />
+                    <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center">
+                      <Store className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <div className="leading-none">{loc.name}</div>
+                      <div className="text-lg uppercase italic leading-none">{loc.name}</div>
                       <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{loc.address || 'Ubicación central'}</div>
                     </div>
                   </div>
-                  <ArrowRight className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all" />
+                  <ArrowRight className="h-8 w-8 text-primary" />
                 </Button>
               ))}
-              <Button 
-                variant="ghost" 
-                onClick={createDefaultLocation} 
-                disabled={creating} 
-                className="h-16 border-2 border-dashed border-primary/20 text-primary font-black uppercase hover:bg-primary/5 rounded-2xl"
-              >
-                {creating ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2 h-5 w-5" />}
-                Agregar Otra Sucursal
-              </Button>
             </div>
           )}
         </CardContent>

@@ -5,7 +5,7 @@ export type TicketStatus = 'new' | 'preparing' | 'ready' | 'served';
 export type SoldBy = 'unidad' | 'peso';
 export type DiscountType = 'porcentaje' | 'monto';
 export type TpvShape = 'cuadrado' | 'circulo' | 'hexágono';
-export type ServiceType = 'mesa' | 'llevar' | 'domicilio' | 'rappi' | 'ubereats' | 'didifood';
+export type ServiceType = 'mesa' | 'llevar' | 'domicilio' | 'rappi' | 'ubereats' | 'didifood' | 'personalizado';
 
 export interface UserProfile {
   id?: string;
@@ -49,9 +49,9 @@ export interface Location {
   address?: string;
   phoneNumber?: string;
   taxRate?: number;
-  cardFee?: number; // Comisión bancaria
+  cardFee?: number;
   logo?: string;
-  websiteUrl?: string; // Para el QR
+  websiteUrl?: string;
   ticketHeader?: string;
   ticketFooter?: string;
   createdAt: number;
@@ -73,7 +73,7 @@ export interface MenuItem {
   inventoryCount?: number;
   tpvColor: string;
   tpvShape: TpvShape;
-  modifierIds: string[]; // IDs de ModifierGroup
+  modifierIds: string[];
 }
 
 export interface OrderItem {
@@ -107,11 +107,15 @@ export interface Order {
   paidAmount: number;
   serviceType: ServiceType;
   tableNumber?: string;
+  customerName?: string;
+  customerPhone?: string;
   notes?: string;
   createdAt: number;
+  updatedAt?: number;
   locId: string;
   orgId: string;
   staffId?: string;
+  staffName?: string;
 }
 
 export interface KitchenTicket {
