@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState } from 'react';
@@ -41,7 +40,7 @@ export default function RegisterPage() {
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
       const newStoreId = generateStoreId();
       
-      // Crear perfil global con PIN por defecto
+      // Crear perfil global con PIN 1234 por defecto
       await setDoc(doc(db, 'users', user.uid), {
         id: user.uid,
         uid: user.uid,

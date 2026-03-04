@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from 'react';
@@ -49,7 +48,7 @@ export default function LoginPage() {
           firstName: user.displayName?.split(' ')[0] || 'Admin',
           lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
           role: 'admin',
-          pin: '1234', // PIN por defecto
+          pin: '1234', // PIN por defecto garantizado
           createdAt: new Date().toISOString(),
         });
       } else {
@@ -57,7 +56,7 @@ export default function LoginPage() {
         await updateDoc(userDocRef, { 
           orgId: targetStoreId, 
           role: existingData.role || 'admin',
-          pin: existingData.pin || '1234', // Garantizar PIN si no existe
+          pin: existingData.pin || '1234', // Asegurar que tenga PIN 1234 si no tiene uno
           updatedAt: new Date().toISOString() 
         });
       }
@@ -138,7 +137,7 @@ export default function LoginPage() {
           <div className="mx-auto w-20 h-20 bg-white rounded-3xl shadow-2xl flex items-center justify-center mb-6 border border-primary/10">
             <Store className="h-10 w-10 text-primary" />
           </div>
-          <h1 className="text-5xl font-black tracking-tighter text-primary italic uppercase leading-none">RestauranteFlow</h1>
+          <h1 className="text-5xl font-bold tracking-tighter text-primary italic uppercase leading-none">RestauranteFlow</h1>
           <p className="text-muted-foreground font-black text-xs uppercase tracking-[0.2em] opacity-60">Professional POS Systems</p>
         </div>
 
