@@ -813,24 +813,27 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
       });
   };
 
-  const deleteLocation = async (id: string, name: string) => {
+  const deleteLocation = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
     if (id === locId) {
       toast({ variant: 'destructive', title: 'Acción bloqueada', description: 'No puedes eliminar la sucursal activa.' });
       return;
     }
     
-    // Usamos un sistema de confirmación nativo para mayor fiabilidad
-    const confirmDelete = window.confirm(`¿Está seguro de que desea eliminar permanentemente la sucursal "${name}"?`);
-    if (!confirmDelete) return;
+    if (!window.confirm(`¿Está seguro de que desea eliminar permanentemente la sucursal "${name}"?`)) {
+      return;
+    }
 
-    const docRef = doc(db, 'orgs', orgId, 'locations', id);
-    deleteDoc(docRef)
-      .then(() => {
-        toast({ title: "Sede eliminada" });
-      })
-      .catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
-      });
+    try {
+      const docRef = doc(db, 'orgs', orgId, 'locations', id);
+      await deleteDoc(docRef);
+      toast({ title: "Sede eliminada" });
+    } catch (error) {
+      console.error("Delete failed:", error);
+      toast({ variant: 'destructive', title: 'Error al eliminar' });
+    }
   };
 
   return (
@@ -846,10 +849,10 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
              <ScrollArea className="h-[300px] pr-2">
                 <div className="space-y-2">
                    {allLocations.map(l => (
-                      <div key={l.id} className="flex items-center gap-2 p-1">
+                      <div key={l.id} className="relative group flex items-center gap-2">
                         <Button 
                           variant={l.id === locId ? 'default' : 'outline'} 
-                          className="flex-1 h-16 justify-between rounded-xl px-4 border-2 overflow-hidden group"
+                          className="flex-1 h-16 justify-between rounded-xl px-4 border-2 overflow-hidden"
                           onClick={() => setLoc(l)}
                         >
                           <div className="text-left">
@@ -863,8 +866,8 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
                            <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-16 w-12 text-destructive hover:bg-destructive/10 rounded-xl shrink-0"
-                              onClick={() => deleteLocation(l.id, l.name)}
+                              className="h-10 w-10 text-destructive hover:bg-destructive/10 rounded-xl"
+                              onClick={(e) => deleteLocation(e, l.id, l.name)}
                            >
                               <Trash2 className="h-5 w-5" />
                            </Button>
