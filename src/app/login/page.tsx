@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [storeId, setStoreId] = useState('143001'); // Valor demo por defecto
+  const [storeId, setStoreId] = useState('143001'); 
   const [loading, setLoading] = useState(false);
   const auth = useAuth();
   const db = useFirestore();
@@ -43,16 +43,19 @@ export default function LoginPage() {
           ...profileData,
           firstName: user.displayName?.split(' ')[0] || 'Admin',
           lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+          pin: '1234', // PIN por defecto para el dueño
           createdAt: new Date().toISOString(),
         });
       } else {
+        const existingData = userDoc.data();
         await updateDoc(userDocRef, { 
           orgId: targetStoreId, 
+          role: existingData.role || 'admin',
+          pin: existingData.pin || '1234',
           updatedAt: new Date().toISOString() 
         });
       }
 
-      // Aseguramos que la organización exista
       const orgDocRef = doc(db, 'orgs', targetStoreId);
       const orgDoc = await getDoc(orgDocRef);
       if (!orgDoc.exists()) {
@@ -64,9 +67,7 @@ export default function LoginPage() {
         });
       }
 
-      // Guardamos en localStorage como respaldo para el provider
       localStorage.setItem('restauranteFlow_orgId', targetStoreId);
-      
       return { orgId: targetStoreId };
     } catch (error: any) {
       console.error("Error in syncUserProfile:", error);
@@ -88,7 +89,6 @@ export default function LoginPage() {
       
       toast({ title: "Acceso Exitoso", description: "Sincronizando con tu sucursal..." });
       
-      // Damos un pequeño respiro para que Firestore propague el cambio
       setTimeout(() => {
         router.push('/admin');
       }, 800);

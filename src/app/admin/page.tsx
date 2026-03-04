@@ -15,31 +15,25 @@ import { useAuth } from '@/firebase';
 
 export default function AdminPage() {
   const { orgId, locId } = useTenant();
-  const { user, isUserLoading, role } = useUser();
+  const { user, isUserLoading, role, profile } = useUser();
   const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [pinInput, setPinInput] = useState('');
-  const [userProfile, setUserProfile] = useState<any>(null);
 
-  // Efecto para obtener el perfil completo (incluyendo PIN) si es admin/manager
   useEffect(() => {
-    if (user && (role === 'admin' || role === 'manager')) {
-      // El perfil ya viene del onSnapshot en el Provider, pero aseguramos tener el PIN
-      // En este prototipo el PIN está en el documento del usuario
-    }
     if (!isUserLoading && !user) {
       router.push('/login');
     }
-  }, [user, isUserLoading, router, role]);
+  }, [user, isUserLoading, router]);
 
   const handlePinSubmit = () => {
-    // En una app real compararíamos con el PIN hasheado del perfil en Firestore
-    // Aquí usamos el rol y simulamos la validación del PIN del perfil
-    // Para el prototipo, el admin inicial no tiene PIN definido, así que permitimos '1234' o el PIN del staff
-    if (pinInput === '1234' || (role === 'admin' && pinInput === '0000')) {
+    // El PIN real viene del documento de Firestore del usuario
+    const realPin = profile?.pin || '1234'; 
+    
+    if (pinInput === realPin) {
       setIsAuthorized(true);
       toast({ title: "Acceso Concedido", description: "Identidad verificada como administrador." });
     } else {

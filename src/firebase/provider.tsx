@@ -21,6 +21,7 @@ interface UserAuthState {
   orgId: string | null;
   allowedLocs: string[];
   role: string | null;
+  profile?: any;
 }
 
 export interface FirebaseContextState extends UserAuthState {
@@ -71,7 +72,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // Obtenemos el orgId del localStorage si existe (fallback rápido tras login)
         const cachedOrgId = localStorage.getItem('restauranteFlow_orgId');
 
         const unsubscribeUser = onSnapshot(doc(firestore, 'users', firebaseUser.uid), (docSnap) => {
@@ -85,13 +85,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
               userError: null,
               orgId: currentOrgId,
               allowedLocs: userData?.allowedLocIds || [],
-              role: userData?.role || 'admin'
+              role: userData?.role || 'admin',
+              profile: userData
             });
             
-            // Si el orgId cambió o se encontró, lo actualizamos en caché
             if (currentOrgId) localStorage.setItem('restauranteFlow_orgId', currentOrgId);
           } else {
-            // Si el documento no existe aún, pero tenemos caché, lo usamos para no bloquear
             setUserState(prev => ({ 
               ...prev, 
               user: firebaseUser, 
@@ -142,8 +141,8 @@ export const useFirebase = () => {
 export const useAuth = () => useFirebase().auth!;
 export const useFirestore = () => useFirebase().firestore!;
 export const useUser = () => {
-  const { user, isUserLoading, userError, orgId, role } = useFirebase();
-  return { user, isUserLoading, userError, orgId, role };
+  const { user, isUserLoading, userError, orgId, role, profile } = useFirebase();
+  return { user, isUserLoading, userError, orgId, role, profile };
 };
 
 export const useTenant = () => {
