@@ -78,7 +78,7 @@ export default function AdminPage() {
     );
   }
 
-  // Pantalla de Bloqueo por PIN
+  // Pantalla de Bloqueo por PIN (Con asteriscos para seguridad)
   if (!isAuthorized) {
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 text-white p-4">
@@ -92,8 +92,10 @@ export default function AdminPage() {
               <p className="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase mt-2">PIN DE ADMINISTRADOR</p>
             </div>
             <div className="flex justify-center gap-3 text-4xl font-black tracking-widest text-primary h-12">
-              {pinInput.padEnd(4, '•').split('').map((char, i) => (
-                <div key={i} className="w-12 border-b-4 border-zinc-700 pb-2">{char}</div>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="w-12 border-b-4 border-zinc-700 pb-2">
+                  {pinInput[i] ? '•' : ''}
+                </div>
               ))}
             </div>
             <div className="grid grid-cols-3 gap-3 pt-4">

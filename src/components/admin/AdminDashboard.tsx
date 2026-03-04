@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase, useAuth } from '@/firebase';
+import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase, useAuth, useUser } from '@/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { 
@@ -20,7 +20,7 @@ import {
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
   Tag, ImageIcon, Receipt, ChevronRight, Save, 
   Layers, Sliders, Percent, Barcode, Box, Eye, LayoutGrid,
-  MapPin, Phone, Globe, CreditCard, QrCode, Building2, AlertTriangle
+  MapPin, Phone, Globe, CreditCard, QrCode, Building2, AlertTriangle, ShieldCheck, Lock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
@@ -32,6 +32,7 @@ export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
   const db = useFirestore();
   const auth = useAuth();
+  const { profile } = useUser();
   const router = useRouter();
   const { orgId, locId } = useTenant();
   const { toast } = useToast();
@@ -163,7 +164,21 @@ export default function AdminDashboard() {
             </section>
           </TabsContent>
 
-          <TabsContent value="personal">
+          <TabsContent value="personal" className="space-y-12">
+            <Card className="border-t-4 border-t-accent rounded-[2rem] overflow-hidden bg-accent/5">
+              <CardContent className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                 <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center border-2 border-accent/20">
+                       <ShieldCheck className="h-8 w-8 text-accent" />
+                    </div>
+                    <div>
+                       <h3 className="text-xl font-black uppercase italic tracking-tighter leading-none">Mi Perfil Administrativo</h3>
+                       <p className="text-xs font-bold text-muted-foreground uppercase mt-1">Gestiona tu PIN de acceso personal</p>
+                    </div>
+                 </div>
+                 <AdminProfileManager currentProfile={profile} />
+              </CardContent>
+            </Card>
             <StaffManager staff={staffUsers || []} orgId={orgId!} locId={locId!} />
           </TabsContent>
 
@@ -172,6 +187,52 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+    </div>
+  );
+}
+
+function AdminProfileManager({ currentProfile }: { currentProfile: any }) {
+  const db = useFirestore();
+  const { toast } = useToast();
+  const [newPin, setNewPin] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const updatePin = async () => {
+    if (newPin.length !== 4) {
+      toast({ variant: 'destructive', title: 'PIN Inválido', description: 'Debe ser de 4 dígitos.' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const userRef = doc(db, 'users', currentProfile.id);
+      await updateDoc(userRef, { pin: newPin, updatedAt: new Date().toISOString() });
+      toast({ title: 'PIN Actualizado', description: 'Usa tu nuevo PIN la próxima vez que ingreses.' });
+      setNewPin('');
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el PIN.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-end gap-3 w-full md:w-auto">
+      <div className="space-y-1 flex-1 md:flex-none">
+        <Label className="text-[10px] font-black uppercase text-accent ml-1">Nuevo PIN (4 Dígitos)</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-accent/50" />
+          <Input 
+            type="password" 
+            maxLength={4} 
+            value={newPin} 
+            onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))} 
+            className="h-12 w-full md:w-32 pl-10 bg-white border-accent/20 font-black tracking-widest text-center" 
+          />
+        </div>
+      </div>
+      <Button className="h-12 bg-accent hover:bg-accent/90 font-black uppercase rounded-xl px-6" onClick={updatePin} disabled={loading}>
+        {loading ? <Loader2 className="animate-spin" /> : 'CAMBIAR PIN'}
+      </Button>
     </div>
   );
 }
@@ -704,7 +765,7 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
                  </div>
                  <div className="space-y-1">
                     <Label className="text-[10px] font-black uppercase">PIN POS (4 dígitos)</Label>
-                    <Input placeholder="1234" maxLength={4} value={newUser.pin || ''} onChange={e => setNewUser({...newUser, pin: e.target.value})} className="h-12 rounded-xl font-black tracking-widest text-center" />
+                    <Input type="password" placeholder="••••" maxLength={4} value={newUser.pin || ''} onChange={e => setNewUser({...newUser, pin: e.target.value.replace(/\D/g, '')})} className="h-12 rounded-xl font-black tracking-widest text-center" />
                  </div>
               </div>
               <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl" onClick={saveStaffUser} disabled={loading}>GUARDAR PERSONAL</Button>
