@@ -5,23 +5,26 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 import LocationSelector from '@/components/tenant/LocationSelector';
-import { useTenant, useUser, useFirestore } from '@/firebase';
+import { useTenant, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { ShieldAlert, Loader2, Home, RefreshCw, KeyRound, Lock, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function AdminPage() {
   const { orgId, locId } = useTenant();
-  const { user, isUserLoading, role, profile } = useUser();
+  const { user, isUserLoading, role: userRole, profile } = useUser();
   const auth = useAuth();
+  const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
   
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [pinInput, setPinInput] = useState('');
+  const [isValidating, setIsValidating] = useState(false);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -29,16 +32,46 @@ export default function AdminPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handlePinSubmit = () => {
-    // El PIN real viene del documento de Firestore del usuario
-    const realPin = profile?.pin || '1234'; 
+  const handlePinSubmit = async () => {
+    if (pinInput.length !== 4) return;
+    setIsValidating(true);
     
-    if (pinInput === realPin) {
-      setIsAuthorized(true);
-      toast({ title: "Acceso Concedido", description: "Identidad verificada como administrador." });
-    } else {
-      toast({ variant: "destructive", title: "PIN Incorrecto", description: "No tiene permisos para acceder a esta área." });
+    try {
+      // 1. Verificar primero contra el perfil del dueño (usuario logueado)
+      if (profile?.pin === pinInput) {
+        setIsAuthorized(true);
+        toast({ title: "Acceso Concedido", description: "Identidad verificada como Dueño." });
+        setIsValidating(false);
+        return;
+      }
+
+      // 2. Si no es el dueño, buscar en la lista de Staff de la organización
+      if (orgId) {
+        const staffRef = collection(db, 'orgs', orgId, 'users');
+        const q = query(staffRef, where('pin', '==', pinInput));
+        const querySnapshot = await getDocs(q);
+        
+        const authorizedStaff = querySnapshot.docs.find(doc => {
+          const data = doc.data();
+          return data.role === 'admin' || data.role === 'manager';
+        });
+
+        if (authorizedStaff) {
+          setIsAuthorized(true);
+          toast({ title: "Acceso Concedido", description: `Identidad verificada: ${authorizedStaff.data().name}` });
+          setIsValidating(false);
+          return;
+        }
+      }
+
+      // 3. Fallo total
+      toast({ variant: "destructive", title: "PIN Incorrecto", description: "No tiene permisos de Administrador o Gerente." });
       setPinInput('');
+    } catch (error) {
+      console.error("Error validating PIN:", error);
+      toast({ variant: "destructive", title: "Error de Seguridad", description: "No se pudo verificar la identidad." });
+    } finally {
+      setIsValidating(false);
     }
   };
 
@@ -59,24 +92,6 @@ export default function AdminPage() {
   }
 
   if (!user) return null;
-
-  // Verificación de Rol
-  if (role !== 'admin' && role !== 'manager') {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center p-8 text-center space-y-6 bg-background">
-        <div className="p-6 bg-destructive/10 rounded-full">
-          <ShieldAlert className="h-16 w-16 text-destructive" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-3xl font-black uppercase italic tracking-tighter text-primary">Acceso Denegado</h2>
-          <p className="max-w-md mx-auto text-muted-foreground font-bold">Solo personal con rango de Administrador o Gerente puede entrar aquí.</p>
-        </div>
-        <Button onClick={() => router.push('/')} variant="default" className="h-14 px-8 rounded-2xl font-black gap-2">
-          <Home className="h-5 w-5" /> VOLVER AL INICIO
-        </Button>
-      </div>
-    );
-  }
 
   // Pantalla de Bloqueo por PIN (Con asteriscos para seguridad)
   if (!isAuthorized) {
@@ -104,13 +119,14 @@ export default function AdminPage() {
                   key={val} 
                   variant="outline" 
                   className="h-16 text-2xl font-black rounded-2xl border-white/5 bg-zinc-800/50 hover:bg-primary hover:text-white transition-all active:scale-90"
+                  disabled={isValidating}
                   onClick={() => {
                     if (val === 'C') setPinInput('');
                     else if (val === 'OK') handlePinSubmit();
-                    else if (pinInput.length < 4) setPinInput(prev => prev + val);
+                    else if (pinInput.length < 4) setPinInput(prev => prev + (val.toString()));
                   }}
                 >
-                  {val}
+                  {val === 'OK' && isValidating ? <Loader2 className="animate-spin h-6 w-6" /> : val}
                 </Button>
               ))}
             </div>
