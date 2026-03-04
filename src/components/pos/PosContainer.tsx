@@ -6,7 +6,7 @@ import {
   Plus, Minus, Trash2, CreditCard, Banknote, X, ShoppingBag, 
   Search, Loader2, KeyRound, LogOut, Tag, Receipt, ChevronRight, 
   Menu, Save, Utensils, Clock, Gift, ArrowRightLeft, Eraser, Trash,
-  Edit3, MessageSquare, Check, Sliders
+  Edit3, MessageSquare, Check, Sliders, Smartphone
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { useFirestore, useCollection, useTenant, useMemoFirebase, useDoc } from 
 import { collection, doc, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import LocationSelector from '@/components/tenant/LocationSelector';
+import { Separator } from '@/components/ui/separator';
 
 const SERVICE_OPTIONS = [
   "Mesa 1", "Mesa 2", "Mesa 3", "Mesa 4", "Mesa 5",
@@ -58,7 +59,6 @@ export default function PosContainer() {
   const [isLocked, setIsLocked] = useState(true);
   const [selectedCat, setSelectedCat] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [isDiscountOpen, setIsDiscountOpen] = useState(false);
   const [isTicketsOpen, setIsTicketsOpen] = useState(false);
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
 
@@ -66,6 +66,7 @@ export default function PosContainer() {
   const [modifyingItem, setModifyingItem] = useState<{item: OrderItem, index: number} | null>(null);
   const [modifyingNotes, setModifyingNotes] = useState('');
   const [modifyingSelectedMods, setModifyingSelectedMods] = useState<{name: string, price: number}[]>([]);
+  const [modifyingDiscount, setModifyingDiscount] = useState<{value: number, type: DiscountType} | null>(null);
 
   useEffect(() => {
     if (orgId && locId && activeStaff && !activeOrder) {
@@ -114,29 +115,31 @@ export default function PosContainer() {
     return items;
   }, [menuItems, selectedCat, search]);
 
-  const updateOrderTotals = (items: OrderItem[], discount: number = 0, dType: DiscountType = 'porcentaje') => {
+  const updateOrderTotals = (items: OrderItem[]) => {
     const subtotal = items.reduce((acc, i) => {
       const itemBase = i.priceAtOrder * i.quantity;
       const modsTotal = (i.selectedModifiers || []).reduce((mAcc, m) => mAcc + (m.price * i.quantity), 0);
-      return acc + itemBase + modsTotal;
+      let itemTotal = itemBase + modsTotal;
+      
+      if (i.discountValue) {
+        if (i.discountType === 'porcentaje') itemTotal -= itemTotal * (i.discountValue / 100);
+        else itemTotal -= i.discountValue * i.quantity;
+      }
+      
+      return acc + itemTotal;
     }, 0);
 
-    let finalDiscount = discount;
-    if (dType === 'porcentaje') finalDiscount = subtotal * (discount / 100);
-    
-    const taxableSubtotal = subtotal - finalDiscount;
     const taxRate = (locationData?.taxRate || 0) / 100;
-    const tax = taxableSubtotal * taxRate;
-    const total = taxableSubtotal + tax;
+    const tax = subtotal * taxRate;
+    const total = subtotal + tax;
 
     setActiveOrder(prev => prev ? ({ 
       ...prev, 
       items, 
       subtotal, 
       tax, 
-      total, 
-      discountAmount: discount, 
-      discountType: dType 
+      total,
+      discountAmount: items.reduce((acc, i) => acc + (i.discountValue || 0), 0)
     }) : null);
   };
 
@@ -154,20 +157,21 @@ export default function PosContainer() {
     const newItems = [...(activeOrder?.items || []), newItem];
     const newIdx = newItems.length - 1;
 
-    // Si el item tiene modificadores, abrir el diálogo inmediatamente
     if ((menuItem.modifierIds && menuItem.modifierIds.length > 0)) {
         setModifyingItem({ item: newItem, index: newIdx });
         setModifyingNotes('');
         setModifyingSelectedMods([]);
+        setModifyingDiscount(null);
     }
 
-    updateOrderTotals(newItems, activeOrder?.discountAmount, activeOrder?.discountType);
+    updateOrderTotals(newItems);
   };
 
   const openItemEditor = (item: OrderItem, index: number) => {
     setModifyingItem({ item, index });
     setModifyingNotes(item.notes || '');
     setModifyingSelectedMods(item.selectedModifiers || []);
+    setModifyingDiscount(item.discountValue ? { value: item.discountValue, type: item.discountType || 'porcentaje' } : null);
   };
 
   const saveItemModifications = () => {
@@ -177,10 +181,12 @@ export default function PosContainer() {
     newItems[modifyingItem.index] = {
       ...newItems[modifyingItem.index],
       notes: modifyingNotes,
-      selectedModifiers: modifyingSelectedMods
+      selectedModifiers: modifyingSelectedMods,
+      discountValue: modifyingDiscount?.value,
+      discountType: modifyingDiscount?.type
     };
     
-    updateOrderTotals(newItems, activeOrder.discountAmount, activeOrder.discountType);
+    updateOrderTotals(newItems);
     setModifyingItem(null);
     toast({ title: "Cambios aplicados" });
   };
@@ -228,7 +234,7 @@ export default function PosContainer() {
     }
   };
 
-  const completePayment = async (method: 'cash' | 'card') => {
+  const completePayment = async (method: 'cash' | 'card' | 'transfer') => {
     if (!activeOrder || activeOrder.items.length === 0) return;
     try {
       const orderData = {
@@ -245,7 +251,7 @@ export default function PosContainer() {
         await addDoc(collection(db, 'orgs', orgId!, 'locations', locId!, 'orders'), orderData);
       }
 
-      toast({ title: "Venta Pagada", description: `Pedido ${activeOrder.id} finalizado.` });
+      toast({ title: "Venta Pagada", description: `Pedido ${activeOrder.id} finalizado vía ${method === 'transfer' ? 'Transferencia' : method}.` });
       setActiveOrder(createEmptyOrder());
     } catch (e) { 
         console.error("Error processing payment:", e);
@@ -259,7 +265,6 @@ export default function PosContainer() {
     toast({ title: `Pedido ${order.id} cargado` });
   };
 
-  // Filtrar los modificadores disponibles para el item que se está editando
   const currentItemInMenu = useMemo(() => {
     if (!modifyingItem) return null;
     return menuItems?.find(mi => mi.id === modifyingItem.item.menuItemId);
@@ -395,14 +400,14 @@ export default function PosContainer() {
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
                                const newItems = [...activeOrder.items];
                                newItems[idx].quantity += 1;
-                               updateOrderTotals(newItems, activeOrder.discountAmount, activeOrder.discountType);
+                               updateOrderTotals(newItems);
                             }}><Plus className="h-3 w-3" /></Button>
                             <span className="font-black text-lg py-1">{item.quantity}</span>
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
                                const newItems = [...activeOrder.items];
                                if (newItems[idx].quantity > 1) newItems[idx].quantity -= 1;
                                else newItems.splice(idx, 1);
-                               updateOrderTotals(newItems, activeOrder.discountAmount, activeOrder.discountType);
+                               updateOrderTotals(newItems);
                             }}><Minus className="h-3 w-3" /></Button>
                          </div>
                          <div className="cursor-pointer flex-1">
@@ -410,11 +415,14 @@ export default function PosContainer() {
                             <div className="flex flex-wrap gap-1 mt-1">
                                {item.selectedModifiers?.map((m, mIdx) => <Badge key={mIdx} variant="secondary" className="text-[8px] font-bold">+{m.name}</Badge>)}
                                {item.notes && <Badge variant="outline" className="text-[8px] italic border-primary/40"><MessageSquare className="h-2 w-2 mr-1" /> {item.notes}</Badge>}
+                               {item.discountValue && <Badge className="text-[8px] bg-accent text-white border-0">DESC: {item.discountType === 'porcentaje' ? `${item.discountValue}%` : `$${item.discountValue}`}</Badge>}
                             </div>
                          </div>
                       </div>
                       <div className="text-right">
-                         <span className="font-black text-primary">${((item.priceAtOrder + (item.selectedModifiers?.reduce((acc, m) => acc + m.price, 0) || 0)) * item.quantity).toFixed(2)}</span>
+                         <span className="font-black text-primary">
+                            ${(((item.priceAtOrder + (item.selectedModifiers?.reduce((acc, m) => acc + m.price, 0) || 0)) * item.quantity) - (item.discountValue ? (item.discountType === 'porcentaje' ? (item.priceAtOrder * item.quantity * (item.discountValue / 100)) : (item.discountValue * item.quantity)) : 0)).toFixed(2)}
+                         </span>
                          <div className="flex flex-col gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-all items-end">
                             <Button 
                               variant="outline" 
@@ -427,7 +435,7 @@ export default function PosContainer() {
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => {
                                const newItems = [...activeOrder.items];
                                newItems.splice(idx, 1);
-                               updateOrderTotals(newItems, activeOrder.discountAmount, activeOrder.discountType);
+                               updateOrderTotals(newItems);
                             }}><Trash2 className="h-3 w-3" /></Button>
                          </div>
                       </div>
@@ -449,22 +457,7 @@ export default function PosContainer() {
              <div className="flex justify-between text-[10px] font-black text-muted-foreground uppercase"><span>IVA ({locationData?.taxRate || 0}%)</span><span>${activeOrder?.tax.toFixed(2)}</span></div>
            </div>
            
-           <div className="flex justify-between items-center">
-              <Dialog open={isDiscountOpen} onOpenChange={setIsDiscountOpen}>
-                 <Button variant="outline" className="h-10 rounded-xl font-black gap-2 border-2" onClick={() => setIsDiscountOpen(true)}><Tag className="h-4 w-4" /> DESCUENTOS</Button>
-                 <DialogContent className="rounded-[2rem] p-8">
-                    <DialogHeader><DialogTitle className="font-black uppercase italic text-2xl">Promociones</DialogTitle></DialogHeader>
-                    <div className="grid grid-cols-2 gap-4 pt-4">
-                       {allDiscounts?.map(d => (
-                         <Button key={d.id} variant="outline" className="h-20 flex flex-col rounded-2xl border-2" onClick={() => { updateOrderTotals(activeOrder?.items || [], d.value, d.type); setIsDiscountOpen(false); }}>
-                            <span className="font-black text-xs uppercase">{d.name}</span>
-                            <span className="text-xl font-black text-primary">{d.type === 'porcentaje' ? `${d.value}%` : `$${d.value}`}</span>
-                         </Button>
-                       ))}
-                       <Button variant="ghost" className="h-20 border-2 border-dashed rounded-2xl" onClick={() => { updateOrderTotals(activeOrder?.items || [], 0); setIsDiscountOpen(false); }}>QUITAR DESCUENTOS</Button>
-                    </div>
-                 </DialogContent>
-              </Dialog>
+           <div className="flex justify-end items-center">
               <div className="text-right">
                  <p className="text-[10px] font-black uppercase text-muted-foreground">Total</p>
                  <h3 className="text-5xl font-black italic tracking-tighter text-primary leading-none">${activeOrder?.total.toFixed(2)}</h3>
@@ -475,23 +468,23 @@ export default function PosContainer() {
               <Button className="h-14 font-black text-lg bg-orange-600 hover:bg-orange-700 shadow-lg rounded-2xl text-white" onClick={handleSendToKitchen}>
                 <Save className="mr-2 h-5 w-5" /> ENVIAR A COCINA (GUARDAR)
               </Button>
-              <div className="grid grid-cols-2 gap-3">
-                 <Button className="h-14 font-black text-lg bg-green-600 hover:bg-green-700 shadow-xl rounded-2xl text-white border-b-4 border-green-800" onClick={() => completePayment('cash')}><Banknote className="mr-2" /> EFECTIVO</Button>
-                 <Button className="h-14 font-black text-lg bg-blue-600 hover:bg-blue-700 shadow-xl rounded-2xl text-white border-b-4 border-blue-800" onClick={() => completePayment('card')}><CreditCard className="mr-2" /> TARJETA</Button>
+              <div className="grid grid-cols-3 gap-3">
+                 <Button className="h-14 font-black text-xs bg-green-600 hover:bg-green-700 shadow-xl rounded-2xl text-white border-b-4 border-green-800 p-1" onClick={() => completePayment('cash')}><Banknote className="h-4 w-4 mb-1" /> EFECTIVO</Button>
+                 <Button className="h-14 font-black text-xs bg-blue-600 hover:bg-blue-700 shadow-xl rounded-2xl text-white border-b-4 border-blue-800 p-1" onClick={() => completePayment('card')}><CreditCard className="h-4 w-4 mb-1" /> TARJETA</Button>
+                 <Button className="h-14 font-black text-xs bg-zinc-700 hover:bg-zinc-800 shadow-xl rounded-2xl text-white border-b-4 border-zinc-900 p-1" onClick={() => completePayment('transfer')}><Smartphone className="h-4 w-4 mb-1" /> TRANSF.</Button>
               </div>
            </div>
         </div>
       </aside>
 
-      {/* Diálogo para Modificadores y Comentarios */}
       <Dialog open={!!modifyingItem} onOpenChange={(open) => !open && setModifyingItem(null)}>
-        <DialogContent className="rounded-[2.5rem] p-8 max-w-md">
+        <DialogContent className="rounded-[2.5rem] p-8 max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
                 <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter text-primary">
                     Opciones de {modifyingItem?.item.name}
                 </DialogTitle>
                 <DialogDescription className="text-[10px] font-bold uppercase tracking-widest">
-                    Seleccione modificadores e instrucciones especiales
+                    Seleccione modificadores, descuentos e instrucciones especiales
                 </DialogDescription>
             </DialogHeader>
 
@@ -502,12 +495,37 @@ export default function PosContainer() {
                         placeholder="Ej: Sin cebolla, término medio, etc." 
                         value={modifyingNotes} 
                         onChange={(e) => setModifyingNotes(e.target.value)}
-                        className="rounded-2xl border-2 min-h-[100px] bg-muted/20 focus-visible:ring-primary font-bold"
+                        className="rounded-2xl border-2 min-h-[80px] bg-muted/20 focus-visible:ring-primary font-bold"
                     />
                 </div>
 
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase ml-1 flex items-center gap-2"><Tag className="h-3 w-3" /> Aplicar Descuento al Producto</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {allDiscounts?.map(d => (
+                            <Button 
+                                key={d.id} 
+                                variant={modifyingDiscount?.value === d.value ? "default" : "outline"}
+                                className="h-12 rounded-xl border-2 font-black text-[10px]"
+                                onClick={() => setModifyingDiscount({ value: d.value, type: d.type })}
+                            >
+                                {d.name} ({d.type === 'porcentaje' ? `${d.value}%` : `$${d.value}`})
+                            </Button>
+                        ))}
+                        <Button 
+                            variant="ghost" 
+                            className="h-12 border-2 border-dashed rounded-xl font-black text-[10px]"
+                            onClick={() => setModifyingDiscount(null)}
+                        >
+                            SIN DESCUENTO
+                        </Button>
+                    </div>
+                </div>
+
+                <Separator />
+
                 {availableModifiers.length > 0 ? (
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-4">
                         {availableModifiers.map((group) => (
                             <div key={group.id} className="space-y-2">
                                 <p className="text-[10px] font-black text-primary uppercase bg-primary/5 px-3 py-1 rounded-lg border-l-2 border-primary">{group.name}</p>
@@ -539,13 +557,13 @@ export default function PosContainer() {
                         ))}
                     </div>
                 ) : (
-                  <div className="py-8 text-center bg-muted/20 rounded-2xl border-2 border-dashed">
-                     <p className="text-[10px] font-black uppercase text-muted-foreground italic">No hay grupos de modificadores vinculados a este producto</p>
+                  <div className="py-4 text-center bg-muted/20 rounded-2xl border-2 border-dashed">
+                     <p className="text-[10px] font-black uppercase text-muted-foreground italic">No hay modificadores disponibles</p>
                   </div>
                 )}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-white pt-4">
                 <Button className="w-full h-14 font-black text-lg rounded-2xl shadow-xl" onClick={saveItemModifications}>
                     <Check className="mr-2" /> CONFIRMAR SELECCIÓN
                 </Button>

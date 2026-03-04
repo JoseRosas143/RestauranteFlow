@@ -1,4 +1,3 @@
-
 export type UserRole = 'admin' | 'manager' | 'cashier' | 'kitchen';
 export type OrderStatus = 'draft' | 'open' | 'confirmed' | 'paid';
 export type TicketStatus = 'new' | 'preparing' | 'ready' | 'served';
@@ -84,6 +83,8 @@ export interface OrderItem {
   priceAtOrder: number;
   selectedModifiers: { name: string; price: number }[];
   notes?: string;
+  discountValue?: number;
+  discountType?: DiscountType;
 }
 
 export interface Payment {
