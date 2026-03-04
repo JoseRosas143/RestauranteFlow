@@ -2,39 +2,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- FUNCIONES HELPER ---
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // --- REGLAS DE COLECCIÓN ---
-    // Flexibilizadas para asegurar que el prototipo pueda escribir datos iniciales sin bloqueos
-
-    match /users/{userId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /orgs/{orgId} {
-      allow read, write: if isSignedIn();
-
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn();
-      }
-    }
-
-    match /tickets/{ticketId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    // Regla general de respaldo para desarrollo
+    // Regla global ultra-flexible para el prototipo
+    // Permite cualquier operación si el usuario está autenticado
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if request.auth != null;
     }
   }
 }

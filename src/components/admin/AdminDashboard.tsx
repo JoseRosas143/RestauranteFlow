@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,9 +18,8 @@ import { signOut } from 'firebase/auth';
 import { 
   Plus, Trash2, Package, Loader2, Edit2, 
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
-  Tag, ImageIcon, Receipt, ChevronRight, Save, 
-  Layers, Sliders, Percent, Barcode, Box, Eye, LayoutGrid,
-  MapPin, Phone, Globe, CreditCard, QrCode, Building2, AlertTriangle, ShieldCheck, Lock, Eraser
+  Tag, ImageIcon, Receipt, Save, 
+  Layers, Sliders, Percent, Barcode, Box, Building2, ShieldCheck, Lock, Eraser, MapPin, Phone, Globe, CreditCard
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
@@ -97,18 +96,16 @@ export default function AdminDashboard() {
 
     try {
       const batch = writeBatch(db);
-      
       const collectionsToDelete = ['menuItems', 'categories', 'modifiers', 'discounts'];
       for (const colName of collectionsToDelete) {
         const colRef = collection(db, 'orgs', orgId, 'locations', locId, colName);
         const snap = await getDocs(colRef);
         snap.docs.forEach(d => batch.delete(d.ref));
       }
-
       await batch.commit();
       toast({ title: "Base de datos limpia", description: "Todos los datos del menú han sido eliminados." });
     } catch (e) {
-      toast({ variant: "destructive", title: "Error al limpiar", description: "No se pudieron borrar todos los datos." });
+      toast({ variant: "destructive", title: "Error al limpiar", description: "No se pudieron borrar los datos." });
     }
   };
 
@@ -145,18 +142,18 @@ export default function AdminDashboard() {
       </header>
 
       <main className="flex-1 p-8">
-        <Tabs defaultValue="menu" className="space-y-6 max-w-7xl mx-auto">
+        <Tabs defaultValue="articulos" className="space-y-6 max-w-7xl mx-auto">
           <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem]">
-            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Gestión de Menú</TabsTrigger>
+            <TabsTrigger value="articulos" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
             <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
             <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="menu" className="space-y-12">
+          <TabsContent value="articulos" className="space-y-12">
             <section className="space-y-6">
               <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                 <Package className="h-6 w-6 text-primary" />
-                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Artículos</h2>
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Gestión de Productos</h2>
               </div>
               <ArticulosManager items={items || []} categories={categories || []} modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
             </section>
@@ -182,7 +179,7 @@ export default function AdminDashboard() {
             <section className="space-y-6">
               <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                 <Percent className="h-6 w-6 text-primary" />
-                <h2 className="text-xl font-black uppercase italic tracking-tighter">Descuentos</h2>
+                <h2 className="text-xl font-black uppercase italic tracking-tighter">Descuentos y Promos</h2>
               </div>
               <DiscountsManager discounts={discounts || []} orgId={orgId!} locId={locId!} />
             </section>
@@ -230,7 +227,7 @@ function AdminProfileManager({ currentProfile }: { currentProfile: any }) {
     try {
       const userRef = doc(db, 'users', currentProfile.id);
       await updateDoc(userRef, { pin: newPin, updatedAt: new Date().toISOString() });
-      toast({ title: 'PIN Actualizado', description: 'Usa tu nuevo PIN la próxima vez que ingreses.' });
+      toast({ title: 'PIN Actualizado', description: 'PIN personal actualizado con éxito.' });
       setNewPin('');
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el PIN.' });
@@ -255,7 +252,7 @@ function AdminProfileManager({ currentProfile }: { currentProfile: any }) {
         </div>
       </div>
       <Button className="h-12 bg-accent hover:bg-accent/90 font-black uppercase rounded-xl px-6" onClick={updatePin} disabled={loading}>
-        {loading ? <Loader2 className="animate-spin" /> : 'CAMBIAR PIN'}
+        {loading ? <Loader2 className="animate-spin" /> : 'GUARDAR PIN'}
       </Button>
     </div>
   );
@@ -278,9 +275,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm(prev => ({ ...prev, image: reader.result as string }));
-      };
+      reader.onloadend = () => setForm(prev => ({ ...prev, image: reader.result as string }));
       reader.readAsDataURL(file);
     }
   };
@@ -318,12 +313,8 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
           setForm(initialState);
           setEditingId(null);
         })
-        .catch(async (error) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: docRef.path,
-            operation: 'update',
-            requestResourceData: cleanData
-          }));
+        .catch(async () => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: cleanData }));
         })
         .finally(() => setLoading(false));
     } else {
@@ -332,12 +323,8 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
           toast({ title: "Artículo creado" });
           setForm(initialState);
         })
-        .catch(async (error) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: colRef.path,
-            operation: 'create',
-            requestResourceData: cleanData
-          }));
+        .catch(async () => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: cleanData }));
         })
         .finally(() => setLoading(false));
     }
@@ -406,14 +393,12 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase">Cargar Imagen</Label>
+              <Label className="text-[10px] font-black uppercase">Imagen</Label>
               <div className="flex gap-4 items-center">
                 <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
                   {form.image ? <img src={form.image} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
                 </div>
-                <div className="flex-1">
-                  <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-xs rounded-xl cursor-pointer file:font-black file:uppercase file:text-[8px] file:bg-primary file:text-white file:border-0 file:rounded-md file:mr-2" />
-                </div>
+                <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-[8px] flex-1 rounded-xl file:mr-2 file:bg-primary file:text-white file:border-0" />
               </div>
             </div>
           </div>
@@ -462,7 +447,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pb-12">
         {items.map(item => (
           <Card key={item.id} className="rounded-2xl border-2 hover:border-primary transition-all group overflow-hidden bg-white shadow-sm">
             <div className="p-4 flex items-center gap-4">
@@ -475,11 +460,10 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
                     <h3 className="font-black text-sm uppercase italic truncate">{item.name}</h3>
                     <p className="text-[9px] font-bold text-muted-foreground uppercase">{item.category}</p>
                   </div>
-                  <Badge variant="outline" className="text-[8px] font-black">{item.barcode || 'S/C'}</Badge>
                 </div>
                 <div className="flex justify-between items-end mt-1">
                    <p className="font-black text-primary text-md leading-none">${item.price.toFixed(2)}</p>
-                   <p className="text-[8px] font-bold opacity-40">REF: {item.reference || 'N/A'}</p>
+                   <p className="text-[8px] font-bold opacity-40">BC: {item.barcode || '---'}</p>
                 </div>
               </div>
               <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -512,7 +496,7 @@ function CategoriasManager({ categories, items, orgId, locId }: { categories: Ca
         setForm({ name: '', color: '#B8732E' });
         toast({ title: "Categoría creada" });
       })
-      .catch(async (error) => {
+      .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: form }));
       });
   };
@@ -617,12 +601,11 @@ function ModifiersManager({ modifiers, orgId, locId }: { modifiers: ModifierGrou
             <Input placeholder="Opción" value={optName} onChange={e => setOptName(e.target.value)} className="h-10 rounded-xl" />
             <Input type="number" placeholder="$" value={optPrice || ''} onChange={e => setOptPrice(Number(e.target.value))} className="h-10 rounded-xl" />
           </div>
-          <Button variant="secondary" className="w-full rounded-xl font-bold uppercase text-[10px]" onClick={addOption}>Vincular Opción</Button>
+          <Button variant="secondary" className="w-full rounded-xl font-bold uppercase text-[10px]" onClick={addOption}>Añadir Opción</Button>
           <div className="flex flex-wrap gap-2">
             {options.map((o, i) => <Badge key={i} className="gap-1 px-3 h-8 rounded-lg">{o.name} (${o.price}) <X className="h-3 w-3 cursor-pointer" onClick={() => setOptions(options.filter((_, idx) => idx !== i))} /></Badge>)}
           </div>
           <Button className="w-full h-12 font-black rounded-xl" onClick={save} disabled={loading}>{editingId ? 'GUARDAR CAMBIOS' : 'CREAR GRUPO'}</Button>
-          {editingId && <Button variant="ghost" className="w-full text-[8px] font-black uppercase" onClick={() => {setEditingId(null); setName(''); setOptions([]);}}>Cancelar</Button>}
         </div>
         <ScrollArea className="h-[200px]">
           <div className="space-y-2">
@@ -869,13 +852,13 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
     }
   };
 
-  const save = () => {
-    if (!locId) return;
+  const saveConfig = () => {
+    if (!locId || !orgId) return;
     setLoading(true);
     const docRef = doc(db, 'orgs', orgId, 'locations', locId);
     updateDoc(docRef, { ...form, updatedAt: Date.now() })
       .then(() => {
-        toast({ title: "Configuración actualizada" });
+        toast({ title: "Configuración actualizada", description: "Datos financieros y de ticket guardados." });
       })
       .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: form }));
@@ -905,23 +888,17 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
 
   const deleteLocation = async (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation();
-    e.preventDefault();
-    
     if (id === locId) {
       toast({ variant: 'destructive', title: 'Acción bloqueada', description: 'No puedes eliminar la sucursal activa.' });
       return;
     }
-    
-    if (!window.confirm(`¿Está seguro de que desea eliminar permanentemente la sucursal "${name}"?`)) {
-      return;
-    }
+    if (!window.confirm(`¿Eliminar sucursal "${name}"?`)) return;
 
     try {
       const docRef = doc(db, 'orgs', orgId, 'locations', id);
       await deleteDoc(docRef);
       toast({ title: "Sede eliminada" });
     } catch (error) {
-      console.error("Delete failed:", error);
       toast({ variant: 'destructive', title: 'Error al eliminar' });
     }
   };
@@ -939,24 +916,22 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
              <ScrollArea className="h-[300px] pr-2">
                 <div className="space-y-2">
                    {allLocations.map(l => (
-                      <div key={l.id} className="relative group flex items-center gap-2">
+                      <div key={l.id} className="relative flex items-center gap-2 group">
                         <Button 
                           variant={l.id === locId ? 'default' : 'outline'} 
                           className="flex-1 h-16 justify-between rounded-xl px-4 border-2 overflow-hidden"
                           onClick={() => setLoc(l)}
                         >
                           <div className="text-left">
-                             <div className="font-black text-xs uppercase truncate max-w-[150px]">{l.name}</div>
-                             <div className="text-[8px] font-bold opacity-60 truncate max-w-[150px]">{l.address || 'Ubicación central'}</div>
+                             <div className="font-black text-xs uppercase truncate max-w-[120px]">{l.name}</div>
                           </div>
                           {l.id === locId && <Badge className="bg-white text-primary text-[8px] font-black">ACTIVA</Badge>}
                         </Button>
-                        
                         {l.id !== locId && (
                            <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-10 w-10 text-destructive hover:bg-destructive/10 rounded-xl"
+                              className="h-10 w-10 text-destructive hover:bg-destructive/10 rounded-xl shrink-0"
                               onClick={(e) => deleteLocation(e, l.id, l.name)}
                            >
                               <Trash2 className="h-5 w-5" />
@@ -986,7 +961,9 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
                    <Input type="number" value={form.cardFee ?? 0} onChange={e => setForm({...form, cardFee: Number(e.target.value)})} className="h-12 rounded-xl" />
                 </div>
              </div>
-             <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={save} disabled={loading}>GUARDAR FINANZAS</Button>
+             <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={saveConfig} disabled={loading}>
+               {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR FINANZAS
+             </Button>
           </CardContent>
        </Card>
 
@@ -994,46 +971,38 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
           <CardHeader className="bg-muted/30 border-b"><CardTitle className="font-black uppercase italic text-xl flex items-center gap-2"><Receipt className="h-5 w-5" /> Ticket POS</CardTitle></CardHeader>
           <CardContent className="p-8 space-y-4">
              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase">Logo del Ticket</Label>
+                <Label className="text-[10px] font-black uppercase">Logo</Label>
                 <div className="flex gap-4 items-center">
                    <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
                       {form.logo ? <img src={form.logo} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
                    </div>
-                   <div className="flex-1">
-                    <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-[8px] font-black rounded-xl file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[8px] file:font-black file:bg-primary file:text-white" />
-                   </div>
+                   <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-[8px] flex-1 rounded-xl" />
                 </div>
              </div>
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Dirección Física</Label>
+                <Label className="text-[10px] font-black uppercase">Dirección</Label>
                 <div className="relative">
                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                    <Input value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} className="h-12 pl-12 rounded-xl" />
                 </div>
              </div>
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Teléfono de Contacto</Label>
+                <Label className="text-[10px] font-black uppercase">Teléfono</Label>
                 <div className="relative">
                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                    <Input value={form.phoneNumber || ''} onChange={e => setForm({...form, phoneNumber: e.target.value})} className="h-12 pl-12 rounded-xl" />
                 </div>
              </div>
              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Enlace para QR (Menú/Web)</Label>
+                <Label className="text-[10px] font-black uppercase">Enlace para QR</Label>
                 <div className="relative">
                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                    <Input value={form.websiteUrl || ''} onChange={e => setForm({...form, websiteUrl: e.target.value})} placeholder="https://miweb.com" className="h-12 pl-12 rounded-xl" />
                 </div>
              </div>
-             <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Encabezado Mensaje</Label>
-                <Textarea value={form.ticketHeader || ''} onChange={e => setForm({...form, ticketHeader: e.target.value})} className="min-h-[80px] rounded-xl text-xs" />
-             </div>
-             <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase">Pie de Página / Comentarios</Label>
-                <Textarea value={form.ticketFooter || ''} onChange={e => setForm({...form, ticketFooter: e.target.value})} className="min-h-[80px] rounded-xl text-xs" />
-             </div>
-             <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={save} disabled={loading}>GUARDAR TICKET</Button>
+             <Button className="w-full h-16 font-black text-xl shadow-2xl rounded-2xl mt-4" onClick={saveConfig} disabled={loading}>
+               {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR TICKET
+             </Button>
           </CardContent>
        </Card>
     </div>
