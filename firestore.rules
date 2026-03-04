@@ -1,9 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REGLA GLOBAL DE DESARROLLO
-    // Permite lectura y escritura a CUALQUIER documento en cualquier profundidad
-    // siempre que el usuario esté autenticado. Esto elimina errores de permisos en rutas anidadas multi-tenant.
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

@@ -329,7 +329,7 @@ export default function PosContainer() {
   if (isLocked) {
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 text-white p-4">
-        <Card className="w-full max-w-sm bg-zinc-900 border-zinc-800 rounded-[2.5rem] p-10 shadow-2xl">
+        <Card className="w-full max-sm bg-zinc-900 border-zinc-800 rounded-[2.5rem] p-10 shadow-2xl">
           <div className="text-center space-y-6">
             <div className="w-20 h-20 bg-primary/20 rounded-3xl flex items-center justify-center mx-auto border-2 border-primary/40">
               <KeyRound className="h-10 w-10 text-primary" />
@@ -636,6 +636,10 @@ export default function PosContainer() {
       {/* Loyalty / Customer Selection Dialog */}
       <Dialog open={isLoyaltyOpen} onOpenChange={setIsLoyaltyOpen}>
         <DialogContent className="rounded-none md:rounded-[2.5rem] p-0 md:p-10 max-w-4xl max-h-screen md:max-h-[90vh] overflow-hidden flex flex-col bg-[#1A1A1A] text-white">
+            <DialogHeader className="sr-only">
+                <DialogTitle>Programa de Lealtad</DialogTitle>
+                <DialogDescription>Búsqueda y asignación de clientes para recompensas</DialogDescription>
+            </DialogHeader>
             <div className="p-6 md:p-0 flex flex-col h-full">
               <div className="flex justify-between items-center mb-6">
                 <Button variant="ghost" size="icon" className="text-white rounded-full" onClick={() => { setIsLoyaltyOpen(false); setCustomerSearch(''); }}><ArrowLeft className="h-6 w-6" /></Button>
