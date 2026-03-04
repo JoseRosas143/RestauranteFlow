@@ -65,8 +65,10 @@ export default function PosContainer() {
   
   // Loyalty states
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
+  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [newCustomerForm, setNewCustomerForm] = useState({ name: '', phone: '', email: '', address: '' });
 
   // Estados para modificar un item
   const [modifyingItem, setModifyingItem] = useState<{item: OrderItem, index: number} | null>(null);
@@ -123,7 +125,7 @@ export default function PosContainer() {
 
   const filteredCustomers = useMemo(() => {
     if (!allCustomers) return [];
-    if (!customerSearch) return allCustomers;
+    if (!customerSearch) return [];
     const s = customerSearch.toLowerCase();
     return allCustomers.filter(c => 
       c.name.toLowerCase().includes(s) || 
@@ -255,7 +257,6 @@ export default function PosContainer() {
   const completePayment = async (method: 'cash' | 'card' | 'transfer') => {
     if (!activeOrder || activeOrder.items.length === 0) return;
     try {
-      // Calculate points
       const pointsPerc = (locationData?.loyaltyPointsPercentage || 0) / 100;
       const pointsEarned = activeOrder.total * pointsPerc;
 
@@ -274,7 +275,6 @@ export default function PosContainer() {
         await addDoc(collection(db, 'orgs', orgId!, 'locations', locId!, 'orders'), orderData);
       }
 
-      // Update customer loyalty if assigned
       if (activeOrder.customerId) {
         const custRef = doc(db, 'orgs', orgId!, 'customers', activeOrder.customerId);
         await updateDoc(custRef, {
@@ -313,7 +313,32 @@ export default function PosContainer() {
       customerPhone: customer.phone
     }) : null);
     setIsLoyaltyOpen(false);
+    setIsAddingCustomer(false);
+    setCustomerSearch('');
     toast({ title: "Cliente Asignado", description: customer.name });
+  };
+
+  const handleCreateNewCustomer = async () => {
+    if (!newCustomerForm.name || !newCustomerForm.phone) {
+      toast({ variant: 'destructive', title: "Faltan datos", description: "Nombre y teléfono obligatorios." });
+      return;
+    }
+    try {
+      const colRef = collection(db, 'orgs', orgId!, 'customers');
+      const docRef = await addDoc(colRef, {
+        ...newCustomerForm,
+        points: 0,
+        visits: 0,
+        lastVisit: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      const newCust = { id: docRef.id, ...newCustomerForm, points: 0, visits: 0, lastVisit: Date.now(), createdAt: Date.now() } as Customer;
+      assignCustomerToOrder(newCust);
+      setNewCustomerForm({ name: '', phone: '', email: '', address: '' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Error al crear cliente" });
+    }
   };
 
   const currentItemInMenu = useMemo(() => {
@@ -642,16 +667,41 @@ export default function PosContainer() {
             </DialogHeader>
             <div className="p-6 md:p-0 flex flex-col h-full">
               <div className="flex justify-between items-center mb-6">
-                <Button variant="ghost" size="icon" className="text-white rounded-full" onClick={() => { setIsLoyaltyOpen(false); setCustomerSearch(''); }}><ArrowLeft className="h-6 w-6" /></Button>
+                <Button variant="ghost" size="icon" className="text-white rounded-full" onClick={() => { setIsLoyaltyOpen(false); setIsAddingCustomer(false); setCustomerSearch(''); }}><ArrowLeft className="h-6 w-6" /></Button>
                 <h2 className="text-xl font-black uppercase italic text-center flex-1">Programa de Lealtad</h2>
-                {customerSearch && (
-                  <Button variant="ghost" className="text-primary font-black uppercase text-xs" onClick={() => assignCustomerToOrder(filteredCustomers[0])}>
-                    Añadir al Ticket
+                {!isAddingCustomer && (
+                  <Button variant="ghost" className="text-primary font-black uppercase text-xs" onClick={() => setIsAddingCustomer(true)}>
+                    Nuevo Cliente
                   </Button>
                 )}
               </div>
 
-              {!customerSearch ? (
+              {isAddingCustomer ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                         <Label className="text-[10px] font-black uppercase text-zinc-500">Nombre Completo *</Label>
+                         <Input value={newCustomerForm.name} onChange={e => setNewCustomerForm({...newCustomerForm, name: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold" />
+                      </div>
+                      <div className="space-y-2">
+                         <Label className="text-[10px] font-black uppercase text-zinc-500">Teléfono / Celular *</Label>
+                         <Input value={newCustomerForm.phone} onChange={e => setNewCustomerForm({...newCustomerForm, phone: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold" />
+                      </div>
+                      <div className="space-y-2">
+                         <Label className="text-[10px] font-black uppercase text-zinc-500">Email (Opcional)</Label>
+                         <Input value={newCustomerForm.email} onChange={e => setNewCustomerForm({...newCustomerForm, email: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold" />
+                      </div>
+                      <div className="space-y-2">
+                         <Label className="text-[10px] font-black uppercase text-zinc-500">Dirección</Label>
+                         <Input value={newCustomerForm.address} onChange={e => setNewCustomerForm({...newCustomerForm, address: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold" />
+                      </div>
+                   </div>
+                   <div className="flex gap-4 pt-4">
+                      <Button variant="outline" className="flex-1 h-14 border-white/20 text-white rounded-xl" onClick={() => setIsAddingCustomer(false)}>CANCELAR</Button>
+                      <Button className="flex-1 h-14 bg-primary hover:bg-primary/90 font-black text-white rounded-xl" onClick={handleCreateNewCustomer}>REGISTRAR Y ASIGNAR</Button>
+                   </div>
+                </div>
+              ) : !customerSearch ? (
                 <div className="space-y-6 flex-1 overflow-hidden flex flex-col">
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -672,7 +722,7 @@ export default function PosContainer() {
                   <div className="space-y-4 pb-4">
                     {filteredCustomers.length > 0 ? (
                       filteredCustomers.map(cust => (
-                        <div key={cust.id} className="bg-[#2A2A2A] rounded-[2rem] p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                        <div key={cust.id} className="bg-[#2A2A2A] rounded-[2rem] p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 mb-4">
                           <div className="flex flex-col items-center text-center space-y-4">
                             <div className="w-24 h-24 rounded-full bg-[#3A3A3A] flex items-center justify-center border-4 border-[#4A4A4A]">
                               <UserCircle className="h-14 w-14 text-zinc-500" />
@@ -688,45 +738,39 @@ export default function PosContainer() {
 
                           <Separator className="bg-[#3A3A3A]" />
 
-                          <div className="grid grid-cols-1 gap-6">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="flex items-center gap-6">
                                <Gift className="h-6 w-6 text-zinc-500" />
                                <div>
-                                  <p className="text-2xl font-black text-white">{cust.points.toFixed(2)}</p>
-                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Puntos Acumulados</p>
+                                  <p className="text-2xl font-black text-white">{cust.points?.toFixed(2) || '0.00'}</p>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Puntos</p>
                                </div>
                             </div>
                             <div className="flex items-center gap-6">
                                <ShoppingBag className="h-6 w-6 text-zinc-500" />
                                <div>
-                                  <p className="text-2xl font-black text-white">{cust.visits}</p>
-                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Visitas Totales</p>
+                                  <p className="text-2xl font-black text-white">{cust.visits || 0}</p>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Visitas</p>
                                </div>
                             </div>
                             <div className="flex items-center gap-6">
                                <Calendar className="h-6 w-6 text-zinc-500" />
                                <div>
-                                  <p className="text-lg font-black text-white">{new Date(cust.lastVisit).toLocaleDateString()}</p>
-                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Última Visita</p>
+                                  <p className="text-lg font-black text-white">{cust.lastVisit ? new Date(cust.lastVisit).toLocaleDateString() : 'N/A'}</p>
+                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Última</p>
                                </div>
                             </div>
                           </div>
-
-                          <div className="flex flex-col gap-4 pt-6">
-                             <Button variant="ghost" className="justify-start text-primary font-black uppercase text-xs tracking-widest px-0 h-auto hover:bg-transparent" onClick={() => toast({ title: "Editar perfil no disponible en esta demo" })}><Edit2 className="h-4 w-4 mr-3" /> EDITAR PERFIL</Button>
-                             <Button variant="ghost" className="justify-start text-primary font-black uppercase text-xs tracking-widest px-0 h-auto hover:bg-transparent" onClick={() => toast({ title: "Canje de puntos no disponible" })}><Gift className="h-4 w-4 mr-3" /> CANJEAR PUNTOS</Button>
-                             <Button variant="ghost" className="justify-start text-primary font-black uppercase text-xs tracking-widest px-0 h-auto hover:bg-transparent" onClick={() => toast({ title: "Historial de compras no disponible" })}><History className="h-4 w-4 mr-3" /> VER COMPRAS</Button>
-                          </div>
                           
                           <Button className="w-full h-16 bg-primary hover:bg-primary/90 font-black text-xl rounded-2xl shadow-2xl mt-4" onClick={() => assignCustomerToOrder(cust)}>
-                            AÑADIR AL TICKET
+                            ASIGNAR AL TICKET
                           </Button>
                         </div>
                       ))
                     ) : (
                       <div className="text-center py-20 opacity-40">
                         <p className="font-black uppercase italic">No se encontraron clientes</p>
-                        <Button variant="outline" className="mt-4 border-white/20 text-white rounded-xl" onClick={() => { setIsLoyaltyOpen(false); setCustomerSearch(''); router.push('/admin'); }}>Ir a Registrar Cliente</Button>
+                        <Button variant="outline" className="mt-4 border-white/20 text-white rounded-xl" onClick={() => setIsAddingCustomer(true)}>Crear Nuevo Cliente</Button>
                       </div>
                     )}
                   </div>

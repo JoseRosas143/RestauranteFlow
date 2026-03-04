@@ -870,14 +870,15 @@ function CustomersManager({ customers, orgId }: { customers: Customer[], orgId: 
     };
 
     if (editingId) {
-      updateDoc(doc(colRef, editingId), cleanData)
+      const docRef = doc(colRef, editingId);
+      updateDoc(docRef, cleanData)
         .then(() => { toast({ title: "Cliente actualizado" }); setForm(initialState); setEditingId(null); })
-        .catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `orgs/${orgId}/customers/${editingId}`, operation: 'update' })))
+        .catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: cleanData })))
         .finally(() => setLoading(false));
     } else {
       addDoc(colRef, { ...cleanData, createdAt: Date.now() })
         .then(() => { toast({ title: "Cliente registrado" }); setForm(initialState); })
-        .catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `orgs/${orgId}/customers`, operation: 'create' })))
+        .catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: cleanData })))
         .finally(() => setLoading(false));
     }
   };
@@ -896,7 +897,7 @@ function CustomersManager({ customers, orgId }: { customers: Customer[], orgId: 
             <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Visitas</Label><Input type="number" value={form.visits} onChange={e => setForm({...form, visits: Number(e.target.value)})} className="h-12 rounded-xl" /></div>
           </div>
           <Button className="w-full h-16 bg-accent hover:bg-accent/90 font-black text-xl rounded-2xl" onClick={saveCustomer} disabled={loading}>
-            {loading ? <Loader2 className="animate-spin" /> : 'GUARDAR CLIENTE'}
+            {loading ? <Loader2 className="animate-spin" /> : editingId ? 'GUARDAR CAMBIOS' : 'GUARDAR CLIENTE'}
           </Button>
           {editingId && <Button variant="ghost" className="w-full font-bold text-[10px] uppercase" onClick={() => {setEditingId(null); setForm(initialState);}}>Cancelar</Button>}
         </CardContent>
@@ -915,12 +916,15 @@ function CustomersManager({ customers, orgId }: { customers: Customer[], orgId: 
                   </div>
                   <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => {setForm(c); setEditingId(c.id!);}}><Edit2 className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-full" onClick={() => deleteDoc(doc(db, 'orgs', orgId, 'customers', c.id!))}><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-full" onClick={() => {
+                       const docRef = doc(db, 'orgs', orgId, 'customers', c.id!);
+                       deleteDoc(docRef).catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
+                    }}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-muted/30 p-2 rounded-xl text-center"><p className="text-[8px] font-black uppercase text-muted-foreground">Puntos</p><p className="font-black text-accent">{c.points.toFixed(2)}</p></div>
-                  <div className="bg-muted/30 p-2 rounded-xl text-center"><p className="text-[8px] font-black uppercase text-muted-foreground">Visitas</p><p className="font-black text-accent">{c.visits}</p></div>
+                  <div className="bg-muted/30 p-2 rounded-xl text-center"><p className="text-[8px] font-black uppercase text-muted-foreground">Puntos</p><p className="font-black text-accent">{c.points?.toFixed(2) || '0.00'}</p></div>
+                  <div className="bg-muted/30 p-2 rounded-xl text-center"><p className="text-[8px] font-black uppercase text-muted-foreground">Visitas</p><p className="font-black text-accent">{c.visits || 0}</p></div>
                   <div className="bg-muted/30 p-2 rounded-xl text-center"><p className="text-[8px] font-black uppercase text-muted-foreground">Celular</p><p className="font-black text-[10px] truncate">{c.phone}</p></div>
                 </div>
               </CardContent>
