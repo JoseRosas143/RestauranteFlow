@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -6,7 +5,7 @@ import { KitchenTicket, TicketStatus } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, CheckCircle, Flame, ChefHat, Bell, Loader2, ArrowLeft } from 'lucide-react';
+import { Clock, CheckCircle, Flame, ChefHat, Bell, Loader2, ArrowLeft, MessageSquare } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useTenant, useMemoFirebase } from '@/firebase';
@@ -82,12 +81,12 @@ export default function KdsContainer() {
           </Button>
           <div className="flex items-center gap-3">
             <ChefHat className="h-8 w-8" />
-            <h1 className="text-2xl font-bold">Cocina (KDS)</h1>
+            <h1 className="text-2xl font-bold uppercase tracking-tighter italic">Cocina (KDS)</h1>
           </div>
         </div>
         <div className="flex gap-4">
-          <Badge className="bg-white/20 text-white border-none text-lg px-4 py-1">
-            Activos: {tickets.length}
+          <Badge className="bg-white/20 text-white border-none text-lg px-4 py-1 font-black">
+            PEDIDOS ACTIVOS: {tickets.length}
           </Badge>
         </div>
       </header>
@@ -95,7 +94,7 @@ export default function KdsContainer() {
       <ScrollArea className="flex-1 p-6">
         {!locId ? (
           <div className="flex h-64 items-center justify-center opacity-40">
-            <p className="text-xl font-bold italic">Seleccione una sucursal para ver los pedidos</p>
+            <p className="text-xl font-bold italic uppercase tracking-widest">Seleccione una sucursal para ver los pedidos</p>
           </div>
         ) : isLoading ? (
           <div className="flex h-64 items-center justify-center">
@@ -104,74 +103,77 @@ export default function KdsContainer() {
         ) : tickets.length === 0 ? (
           <div className="flex h-64 flex-col items-center justify-center text-muted-foreground opacity-50">
             <ChefHat className="h-20 w-20 mb-4" />
-            <p className="text-xl font-bold">¡Cocina despejada!</p>
+            <p className="text-xl font-bold uppercase italic">¡Cocina despejada!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {tickets.map((ticket) => (
-              <Card key={ticket.id} className={`overflow-hidden border-2 flex flex-col h-[400px] shadow-sm ${ticket.status === 'new' ? 'border-primary animate-pulse' : 'border-border'}`}>
-                <CardHeader className={`${STATUS_CONFIG[ticket.status].color} py-3 px-4 flex-row justify-between items-center space-y-0`}>
+              <Card key={ticket.id} className={`overflow-hidden border-2 flex flex-col h-[450px] shadow-xl rounded-[2rem] ${ticket.status === 'new' ? 'border-primary animate-pulse' : 'border-border'}`}>
+                <CardHeader className={`${STATUS_CONFIG[ticket.status].color} py-4 px-6 flex-row justify-between items-center space-y-0`}>
                   <div>
-                    <CardTitle className="text-lg">
+                    <CardTitle className="text-xl font-black italic tracking-tighter">
                       #{ticket.orderId.split('-')[1] || ticket.orderId}
                     </CardTitle>
-                    <p className="text-[10px] font-semibold opacity-80 uppercase tracking-wider">{ticket.serviceType}</p>
+                    <p className="text-[10px] font-black opacity-80 uppercase tracking-widest">{ticket.serviceType} • {ticket.tableNumber}</p>
                   </div>
-                  <div className="text-sm font-bold flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> {getElapsedTime(ticket.timestamp)}
+                  <div className="text-sm font-black flex items-center gap-1">
+                    <Clock className="h-4 w-4" /> {getElapsedTime(ticket.timestamp)}
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1 p-4 overflow-hidden">
+                <CardContent className="flex-1 p-6 overflow-hidden bg-white">
                   <ScrollArea className="h-full pr-2">
-                    <ul className="space-y-3">
+                    <ul className="space-y-4">
                       {ticket.items.map((item, idx) => (
-                        <li key={idx} className="border-b pb-2 last:border-0">
+                        <li key={idx} className="border-b-2 border-dashed pb-3 last:border-0">
                           <div className="flex items-center gap-3">
-                            <span className="bg-secondary text-primary font-black px-2 rounded-md text-lg">
+                            <span className="bg-primary/10 text-primary font-black px-2 py-1 rounded-lg text-lg min-w-[32px] text-center">
                               {item.quantity}
                             </span>
-                            <span className="font-bold text-lg leading-tight">{item.name}</span>
+                            <span className="font-black text-lg leading-none uppercase italic tracking-tighter">{item.name}</span>
                           </div>
                           {item.modifiers && item.modifiers.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1 ml-10">
+                            <div className="flex flex-wrap gap-1 mt-2 ml-10">
                               {item.modifiers.map((m, mIdx) => (
-                                <Badge key={mIdx} variant="outline" className="text-[10px] border-primary/30">+ {m}</Badge>
+                                <Badge key={mIdx} variant="secondary" className="text-[9px] font-bold border-primary/20">+{m}</Badge>
                               ))}
                             </div>
                           )}
                           {item.notes && (
-                            <p className="text-xs italic text-muted-foreground mt-1 ml-10 bg-muted p-1 rounded">
-                              "{item.notes}"
-                            </p>
+                            <div className="mt-2 ml-10 bg-muted/40 p-2 rounded-xl border-l-4 border-primary flex gap-2 items-start">
+                              <MessageSquare className="h-3 w-3 text-primary mt-1 shrink-0" />
+                              <p className="text-[11px] font-bold italic text-muted-foreground leading-tight">
+                                "{item.notes}"
+                              </p>
+                            </div>
                           )}
                         </li>
                       ))}
                     </ul>
                   </ScrollArea>
                 </CardContent>
-                <CardFooter className="p-4 bg-muted/30 grid grid-cols-1 gap-2 mt-auto">
+                <CardFooter className="p-6 bg-muted/30 grid grid-cols-1 gap-2 mt-auto border-t">
                   {ticket.status === 'new' && (
                     <Button 
-                      className="bg-primary hover:bg-primary/90 text-white font-bold h-12 text-lg" 
+                      className="bg-primary hover:bg-primary/90 text-white font-black h-14 text-lg rounded-2xl shadow-lg shadow-primary/20" 
                       onClick={() => updateTicketStatus(ticket.id!, 'preparing')}
                     >
-                      Empezar
+                      EMPEZAR PREPARACIÓN
                     </Button>
                   )}
                   {ticket.status === 'preparing' && (
                     <Button 
-                      className="bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg"
+                      className="bg-green-600 hover:bg-green-700 text-white font-black h-14 text-lg rounded-2xl shadow-lg shadow-green-600/20"
                       onClick={() => updateTicketStatus(ticket.id!, 'ready')}
                     >
-                      Listo
+                      MARCAR COMO LISTO
                     </Button>
                   )}
                   {ticket.status === 'ready' && (
                     <Button 
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 text-lg"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-black h-14 text-lg rounded-2xl shadow-lg shadow-blue-600/20"
                       onClick={() => updateTicketStatus(ticket.id!, 'served')}
                     >
-                      Servir
+                      ENTREGAR / SERVIR
                     </Button>
                   )}
                 </CardFooter>

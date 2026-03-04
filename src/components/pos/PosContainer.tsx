@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -6,7 +5,8 @@ import { MenuItem, Order, OrderItem, UserProfile, Category, ServiceType, Discoun
 import { 
   Plus, Minus, Trash2, CreditCard, Banknote, X, ShoppingBag, 
   Search, Loader2, KeyRound, LogOut, Tag, Receipt, ChevronRight, 
-  Menu, Save, Utensils, Clock, Gift, ArrowRightLeft, Eraser, Trash
+  Menu, Save, Utensils, Clock, Gift, ArrowRightLeft, Eraser, Trash,
+  Edit3, MessageSquare, Check
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,13 +14,15 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useTenant, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
 import LocationSelector from '@/components/tenant/LocationSelector';
 
 const SERVICE_OPTIONS = [
@@ -57,10 +59,14 @@ export default function PosContainer() {
   const [isLocked, setIsLocked] = useState(true);
   const [selectedCat, setSelectedCat] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [modifyingItem, setModifyingItem] = useState<{item: OrderItem, index: number} | null>(null);
   const [isDiscountOpen, setIsDiscountOpen] = useState(false);
   const [isTicketsOpen, setIsTicketsOpen] = useState(false);
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
+
+  // Estados para modificar un item
+  const [modifyingItem, setModifyingItem] = useState<{item: OrderItem, index: number} | null>(null);
+  const [modifyingNotes, setModifyingNotes] = useState('');
+  const [modifyingSelectedMods, setModifyingSelectedMods] = useState<{name: string, price: number}[]>([]);
 
   useEffect(() => {
     if (orgId && locId && activeStaff && !activeOrder) {
@@ -142,10 +148,40 @@ export default function PosContainer() {
       name: menuItem.name,
       quantity: 1,
       priceAtOrder: menuItem.price,
-      selectedModifiers: []
+      selectedModifiers: [],
+      notes: ''
     };
+    
+    // Si el item tiene modificadores, abrir el diálogo inmediatamente
+    if ((menuItem.modifierIds && menuItem.modifierIds.length > 0)) {
+        setModifyingItem({ item: newItem, index: activeOrder?.items.length || 0 });
+        setModifyingNotes('');
+        setModifyingSelectedMods([]);
+    }
+
     const newItems = [...(activeOrder?.items || []), newItem];
     updateOrderTotals(newItems, activeOrder?.discountAmount, activeOrder?.discountType);
+  };
+
+  const openItemEditor = (item: OrderItem, index: number) => {
+    setModifyingItem({ item, index });
+    setModifyingNotes(item.notes || '');
+    setModifyingSelectedMods(item.selectedModifiers || []);
+  };
+
+  const saveItemModifications = () => {
+    if (!modifyingItem || !activeOrder) return;
+    
+    const newItems = [...activeOrder.items];
+    newItems[modifyingItem.index] = {
+      ...newItems[modifyingItem.index],
+      notes: modifyingNotes,
+      selectedModifiers: modifyingSelectedMods
+    };
+    
+    updateOrderTotals(newItems, activeOrder.discountAmount, activeOrder.discountType);
+    setModifyingItem(null);
+    toast({ title: "Cambios aplicados al artículo" });
   };
 
   const handleSendToKitchen = async () => {
@@ -178,12 +214,15 @@ export default function PosContainer() {
         timestamp: Date.now(),
         serviceType: activeOrder.serviceType,
         tableNumber: activeOrder.tableNumber,
-        locId
+        locId: locId!
       });
 
       toast({ title: "Enviado a Cocina", description: `Pedido ${activeOrder.id} está en preparación.` });
       setActiveOrder(createEmptyOrder());
-    } catch (e) { toast({ variant: 'destructive', title: "Error al guardar" }); }
+    } catch (e) { 
+      console.error("Error saving order:", e);
+      toast({ variant: 'destructive', title: "Error al guardar el pedido", description: "Verifique su conexión y permisos." }); 
+    }
   };
 
   const completePayment = async (method: 'cash' | 'card') => {
@@ -205,7 +244,10 @@ export default function PosContainer() {
 
       toast({ title: "Venta Pagada", description: `Pedido ${activeOrder.id} finalizado.` });
       setActiveOrder(createEmptyOrder());
-    } catch (e) { toast({ variant: 'destructive', title: "Error al cobrar" }); }
+    } catch (e) { 
+        console.error("Error processing payment:", e);
+        toast({ variant: 'destructive', title: "Error al procesar pago" }); 
+    }
   };
 
   const selectOpenTicket = (order: Order) => {
@@ -213,6 +255,10 @@ export default function PosContainer() {
     setIsTicketsOpen(false);
     toast({ title: `Pedido ${order.id} cargado` });
   };
+
+  // Filtrar los modificadores disponibles para el item que se está editando
+  const currentItemInMenu = menuItems?.find(mi => mi.id === modifyingItem?.item.menuItemId);
+  const availableModifiers = allModifiers?.filter(m => currentItemInMenu?.modifierIds.includes(m.id!)) || [];
 
   if (isLocked) {
     return (
@@ -349,18 +395,18 @@ export default function PosContainer() {
                                updateOrderTotals(newItems, activeOrder.discountAmount, activeOrder.discountType);
                             }}><Minus className="h-3 w-3" /></Button>
                          </div>
-                         <div>
-                            <h4 className="font-black text-sm uppercase italic leading-tight">{item.name}</h4>
+                         <div className="cursor-pointer flex-1" onClick={() => openItemEditor(item, idx)}>
+                            <h4 className="font-black text-sm uppercase italic leading-tight group-hover:text-primary transition-colors">{item.name}</h4>
                             <div className="flex flex-wrap gap-1 mt-1">
                                {item.selectedModifiers.map((m, mIdx) => <Badge key={mIdx} variant="secondary" className="text-[8px] font-bold">+{m.name}</Badge>)}
-                               {item.notes && <Badge variant="outline" className="text-[8px] italic">{item.notes}</Badge>}
+                               {item.notes && <Badge variant="outline" className="text-[8px] italic border-primary/40"><MessageSquare className="h-2 w-2 mr-1" /> {item.notes}</Badge>}
                             </div>
                          </div>
                       </div>
                       <div className="text-right">
                          <span className="font-black text-primary">${((item.priceAtOrder + item.selectedModifiers.reduce((acc, m) => acc + m.price, 0)) * item.quantity).toFixed(2)}</span>
                          <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-muted" onClick={() => setModifyingItem({ item, index: idx })}><Receipt className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-muted" onClick={() => openItemEditor(item, idx)}><Edit3 className="h-3 w-3" /></Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => {
                                const newItems = [...activeOrder.items];
                                newItems.splice(idx, 1);
@@ -388,7 +434,7 @@ export default function PosContainer() {
            
            <div className="flex justify-between items-center">
               <Dialog open={isDiscountOpen} onOpenChange={setIsDiscountOpen}>
-                 <DialogTrigger asChild><Button variant="outline" className="h-10 rounded-xl font-black gap-2 border-2"><Tag className="h-4 w-4" /> DESCUENTOS</Button></DialogTrigger>
+                 <Button variant="outline" className="h-10 rounded-xl font-black gap-2 border-2" onClick={() => setIsDiscountOpen(true)}><Tag className="h-4 w-4" /> DESCUENTOS</Button>
                  <DialogContent className="rounded-[2rem] p-8">
                     <DialogHeader><DialogTitle className="font-black uppercase italic text-2xl">Promociones</DialogTitle></DialogHeader>
                     <div className="grid grid-cols-2 gap-4 pt-4">
@@ -419,6 +465,73 @@ export default function PosContainer() {
            </div>
         </div>
       </aside>
+
+      {/* Diálogo para Modificadores y Comentarios */}
+      <Dialog open={!!modifyingItem} onOpenChange={(open) => !open && setModifyingItem(null)}>
+        <DialogContent className="rounded-[2.5rem] p-8 max-w-md">
+            <DialogHeader>
+                <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter text-primary">
+                    Opciones de {modifyingItem?.item.name}
+                </DialogTitle>
+                <DialogDescription className="text-[10px] font-bold uppercase tracking-widest">
+                    Añada notas especiales o modificadores
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase ml-1">Comentarios / Notas</Label>
+                    <Textarea 
+                        placeholder="Ej: Sin cebolla, término medio, etc." 
+                        value={modifyingNotes} 
+                        onChange={(e) => setModifyingNotes(e.target.value)}
+                        className="rounded-2xl border-2 min-h-[100px] bg-muted/20 focus-visible:ring-primary"
+                    />
+                </div>
+
+                {availableModifiers.length > 0 && (
+                    <div className="space-y-3">
+                        <Label className="text-[10px] font-black uppercase ml-1">Modificadores</Label>
+                        <div className="grid grid-cols-1 gap-2">
+                            {availableModifiers.map((group) => (
+                                <div key={group.id} className="space-y-2">
+                                    <p className="text-[9px] font-black text-muted-foreground uppercase bg-muted/40 px-3 py-1 rounded-lg">{group.name}</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {group.options.map((opt, idx) => {
+                                            const isSelected = modifyingSelectedMods.some(m => m.name === opt.name);
+                                            return (
+                                                <Button 
+                                                    key={idx} 
+                                                    variant={isSelected ? "default" : "outline"}
+                                                    className={`h-12 rounded-xl border-2 flex justify-between px-3 ${isSelected ? 'shadow-lg shadow-primary/20' : ''}`}
+                                                    onClick={() => {
+                                                        if (isSelected) {
+                                                            setModifyingSelectedMods(modifyingSelectedMods.filter(m => m.name !== opt.name));
+                                                        } else {
+                                                            setModifyingSelectedMods([...modifyingSelectedMods, opt]);
+                                                        }
+                                                    }}
+                                                >
+                                                    <span className="text-[10px] font-bold uppercase truncate">{opt.name}</span>
+                                                    <span className="text-[10px] font-black opacity-60">${opt.price}</span>
+                                                </Button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <DialogFooter>
+                <Button className="w-full h-14 font-black text-lg rounded-2xl" onClick={saveItemModifications}>
+                    <Check className="mr-2" /> APLICAR CAMBIOS
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isTicketsOpen} onOpenChange={setIsTicketsOpen}>
          <DialogContent className="rounded-[2.5rem] p-10 max-w-4xl max-h-[90vh] flex flex-col">
