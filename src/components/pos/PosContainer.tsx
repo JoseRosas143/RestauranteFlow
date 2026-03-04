@@ -152,14 +152,16 @@ export default function PosContainer() {
       notes: ''
     };
     
+    const newItems = [...(activeOrder?.items || []), newItem];
+    const newIdx = newItems.length - 1;
+
     // Si el item tiene modificadores, abrir el diálogo inmediatamente
     if ((menuItem.modifierIds && menuItem.modifierIds.length > 0)) {
-        setModifyingItem({ item: newItem, index: activeOrder?.items.length || 0 });
+        setModifyingItem({ item: newItem, index: newIdx });
         setModifyingNotes('');
         setModifyingSelectedMods([]);
     }
 
-    const newItems = [...(activeOrder?.items || []), newItem];
     updateOrderTotals(newItems, activeOrder?.discountAmount, activeOrder?.discountType);
   };
 
@@ -181,11 +183,14 @@ export default function PosContainer() {
     
     updateOrderTotals(newItems, activeOrder.discountAmount, activeOrder.discountType);
     setModifyingItem(null);
-    toast({ title: "Cambios aplicados al artículo" });
+    toast({ title: "Cambios aplicados" });
   };
 
   const handleSendToKitchen = async () => {
-    if (!activeOrder || activeOrder.items.length === 0) return;
+    if (!activeOrder || activeOrder.items.length === 0) {
+      toast({ variant: 'destructive', title: "Ticket vacío" });
+      return;
+    }
     try {
       const orderData = {
         ...activeOrder,
@@ -199,7 +204,6 @@ export default function PosContainer() {
       } else {
         const docRef = await addDoc(collection(db, 'orgs', orgId!, 'locations', locId!, 'orders'), orderData);
         firestoreId = docRef.id;
-        setActiveOrder({ ...activeOrder, firestoreId });
       }
 
       await addDoc(collection(db, 'orgs', orgId!, 'locations', locId!, 'kitchenTickets'), {
@@ -221,7 +225,7 @@ export default function PosContainer() {
       setActiveOrder(createEmptyOrder());
     } catch (e) { 
       console.error("Error saving order:", e);
-      toast({ variant: 'destructive', title: "Error al guardar el pedido", description: "Verifique su conexión y permisos." }); 
+      toast({ variant: 'destructive', title: "Error al guardar" }); 
     }
   };
 
@@ -258,7 +262,7 @@ export default function PosContainer() {
 
   // Filtrar los modificadores disponibles para el item que se está editando
   const currentItemInMenu = menuItems?.find(mi => mi.id === modifyingItem?.item.menuItemId);
-  const availableModifiers = allModifiers?.filter(m => currentItemInMenu?.modifierIds.includes(m.id!)) || [];
+  const availableModifiers = allModifiers?.filter(m => currentItemInMenu?.modifierIds?.includes(m.id!)) || [];
 
   if (isLocked) {
     return (
@@ -308,7 +312,7 @@ export default function PosContainer() {
           
           <Button variant="outline" className="h-12 rounded-xl font-black gap-2 border-2" onClick={() => setIsTicketsOpen(true)}>
              <Receipt className="h-5 w-5" /> 
-             <span className="hidden md:inline">TICKETS ABIERTOS</span>
+             <span className="hidden md:inline uppercase text-[10px] tracking-widest">Tickets Abiertos</span>
              <Badge className="bg-primary text-white h-5 w-5 flex items-center justify-center p-0 rounded-full">{openOrders?.length || 0}</Badge>
           </Button>
 
@@ -398,13 +402,13 @@ export default function PosContainer() {
                          <div className="cursor-pointer flex-1" onClick={() => openItemEditor(item, idx)}>
                             <h4 className="font-black text-sm uppercase italic leading-tight group-hover:text-primary transition-colors">{item.name}</h4>
                             <div className="flex flex-wrap gap-1 mt-1">
-                               {item.selectedModifiers.map((m, mIdx) => <Badge key={mIdx} variant="secondary" className="text-[8px] font-bold">+{m.name}</Badge>)}
+                               {item.selectedModifiers?.map((m, mIdx) => <Badge key={mIdx} variant="secondary" className="text-[8px] font-bold">+{m.name}</Badge>)}
                                {item.notes && <Badge variant="outline" className="text-[8px] italic border-primary/40"><MessageSquare className="h-2 w-2 mr-1" /> {item.notes}</Badge>}
                             </div>
                          </div>
                       </div>
                       <div className="text-right">
-                         <span className="font-black text-primary">${((item.priceAtOrder + item.selectedModifiers.reduce((acc, m) => acc + m.price, 0)) * item.quantity).toFixed(2)}</span>
+                         <span className="font-black text-primary">${((item.priceAtOrder + (item.selectedModifiers?.reduce((acc, m) => acc + m.price, 0) || 0)) * item.quantity).toFixed(2)}</span>
                          <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100">
                             <Button variant="ghost" size="icon" className="h-7 w-7 bg-muted" onClick={() => openItemEditor(item, idx)}><Edit3 className="h-3 w-3" /></Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => {
@@ -474,60 +478,59 @@ export default function PosContainer() {
                     Opciones de {modifyingItem?.item.name}
                 </DialogTitle>
                 <DialogDescription className="text-[10px] font-bold uppercase tracking-widest">
-                    Añada notas especiales o modificadores
+                    Seleccione modificadores e instrucciones especiales
                 </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-6 py-4">
                 <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase ml-1">Comentarios / Notas</Label>
+                    <Label className="text-[10px] font-black uppercase ml-1">Instrucciones Especiales</Label>
                     <Textarea 
                         placeholder="Ej: Sin cebolla, término medio, etc." 
                         value={modifyingNotes} 
                         onChange={(e) => setModifyingNotes(e.target.value)}
-                        className="rounded-2xl border-2 min-h-[100px] bg-muted/20 focus-visible:ring-primary"
+                        className="rounded-2xl border-2 min-h-[100px] bg-muted/20 focus-visible:ring-primary font-bold"
                     />
                 </div>
 
                 {availableModifiers.length > 0 && (
-                    <div className="space-y-3">
-                        <Label className="text-[10px] font-black uppercase ml-1">Modificadores</Label>
-                        <div className="grid grid-cols-1 gap-2">
-                            {availableModifiers.map((group) => (
-                                <div key={group.id} className="space-y-2">
-                                    <p className="text-[9px] font-black text-muted-foreground uppercase bg-muted/40 px-3 py-1 rounded-lg">{group.name}</p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {group.options.map((opt, idx) => {
-                                            const isSelected = modifyingSelectedMods.some(m => m.name === opt.name);
-                                            return (
-                                                <Button 
-                                                    key={idx} 
-                                                    variant={isSelected ? "default" : "outline"}
-                                                    className={`h-12 rounded-xl border-2 flex justify-between px-3 ${isSelected ? 'shadow-lg shadow-primary/20' : ''}`}
-                                                    onClick={() => {
-                                                        if (isSelected) {
-                                                            setModifyingSelectedMods(modifyingSelectedMods.filter(m => m.name !== opt.name));
-                                                        } else {
-                                                            setModifyingSelectedMods([...modifyingSelectedMods, opt]);
-                                                        }
-                                                    }}
-                                                >
-                                                    <span className="text-[10px] font-bold uppercase truncate">{opt.name}</span>
-                                                    <span className="text-[10px] font-black opacity-60">${opt.price}</span>
-                                                </Button>
-                                            );
-                                        })}
-                                    </div>
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        {availableModifiers.map((group) => (
+                            <div key={group.id} className="space-y-2">
+                                <p className="text-[10px] font-black text-primary uppercase bg-primary/5 px-3 py-1 rounded-lg border-l-2 border-primary">{group.name}</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {group.options.map((opt, idx) => {
+                                        const isSelected = modifyingSelectedMods.some(m => m.name === opt.name);
+                                        return (
+                                            <Button 
+                                                key={idx} 
+                                                variant={isSelected ? "default" : "outline"}
+                                                className={`h-12 rounded-xl border-2 flex justify-between px-3 group transition-all ${isSelected ? 'shadow-md scale-[1.02]' : 'hover:border-primary/40'}`}
+                                                onClick={() => {
+                                                    if (isSelected) {
+                                                        setModifyingSelectedMods(modifyingSelectedMods.filter(m => m.name !== opt.name));
+                                                    } else {
+                                                        setModifyingSelectedMods([...modifyingSelectedMods, opt]);
+                                                    }
+                                                }}
+                                            >
+                                                <span className="text-[10px] font-black uppercase truncate">{opt.name}</span>
+                                                <span className={`text-[10px] font-black opacity-60 ${isSelected ? 'text-white' : 'text-primary'}`}>
+                                                  {opt.price > 0 ? `+$${opt.price}` : 'GRATIS'}
+                                                </span>
+                                            </Button>
+                                        );
+                                    })}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
 
             <DialogFooter>
-                <Button className="w-full h-14 font-black text-lg rounded-2xl" onClick={saveItemModifications}>
-                    <Check className="mr-2" /> APLICAR CAMBIOS
+                <Button className="w-full h-14 font-black text-lg rounded-2xl shadow-xl" onClick={saveItemModifications}>
+                    <Check className="mr-2" /> CONFIRMAR SELECCIÓN
                 </Button>
             </DialogFooter>
         </DialogContent>
@@ -537,14 +540,14 @@ export default function PosContainer() {
          <DialogContent className="rounded-[2.5rem] p-10 max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
                <DialogTitle className="font-black text-3xl uppercase italic text-primary flex items-center gap-3">
-                  <Receipt className="h-8 w-8" /> Mis Tickets Abiertos
+                  <Receipt className="h-8 w-8" /> Tickets Abiertos
                </DialogTitle>
-               <DialogDescription className="font-bold uppercase text-[10px] tracking-widest">Gestiona tus pedidos en curso</DialogDescription>
+               <DialogDescription className="font-bold uppercase text-[10px] tracking-widest">Gestione sus pedidos activos</DialogDescription>
             </DialogHeader>
             <div className="flex gap-4 items-center mt-6">
                <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Buscar por ID, mesa o cliente..." className="pl-12 rounded-xl h-12" />
+                  <Input placeholder="Buscar por ID o mesa..." className="pl-12 rounded-xl h-12" />
                </div>
             </div>
             <ScrollArea className="flex-1 mt-6">
