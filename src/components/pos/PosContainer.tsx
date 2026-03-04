@@ -6,7 +6,7 @@ import {
   Plus, Minus, Trash2, CreditCard, Banknote, X, ShoppingBag, 
   Search, Loader2, KeyRound, LogOut, Tag, Receipt, ChevronRight, 
   Menu, Save, Utensils, Clock, Gift, ArrowRightLeft, Eraser, Trash,
-  Edit3, MessageSquare, Check, Sliders, Smartphone, UserCircle, Phone, Mail, MapPin, Calendar, Edit2, History
+  Edit3, MessageSquare, Check, Sliders, Smartphone, UserCircle, Phone, Mail, MapPin, Calendar, Edit2, History, ArrowLeft
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
