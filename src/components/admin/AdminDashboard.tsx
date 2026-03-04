@@ -13,14 +13,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase, useAuth, useUser } from '@/firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, getDocs, writeBatch } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { 
   Plus, Trash2, Package, Loader2, Edit2, 
   X, ArrowLeft, Users, Settings, Store, LogOut, KeyRound, 
   Tag, ImageIcon, Receipt, ChevronRight, Save, 
   Layers, Sliders, Percent, Barcode, Box, Eye, LayoutGrid,
-  MapPin, Phone, Globe, CreditCard, QrCode, Building2, AlertTriangle, ShieldCheck, Lock
+  MapPin, Phone, Globe, CreditCard, QrCode, Building2, AlertTriangle, ShieldCheck, Lock, Eraser
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } from '@/lib/types';
@@ -91,6 +91,27 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleClearMenu = async () => {
+    if (!orgId || !locId) return;
+    if (!window.confirm("¿ESTÁ SEGURO? Se borrarán todos los artículos, categorías, modificadores y descuentos de esta sucursal.")) return;
+
+    try {
+      const batch = writeBatch(db);
+      
+      const collectionsToDelete = ['menuItems', 'categories', 'modifiers', 'discounts'];
+      for (const colName of collectionsToDelete) {
+        const colRef = collection(db, 'orgs', orgId, 'locations', locId, colName);
+        const snap = await getDocs(colRef);
+        snap.docs.forEach(d => batch.delete(d.ref));
+      }
+
+      await batch.commit();
+      toast({ title: "Base de datos limpia", description: "Todos los datos del menú han sido eliminados." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error al limpiar", description: "No se pudieron borrar todos los datos." });
+    }
+  };
+
   if (!mounted) return null;
 
   return (
@@ -111,6 +132,9 @@ export default function AdminDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={handleClearMenu} className="font-black gap-2 rounded-xl text-destructive hover:bg-destructive/10 border-destructive/20 h-9">
+            <Eraser className="h-4 w-4" /> LIMPIAR MENÚ
+          </Button>
           <Badge variant="outline" className="h-9 px-4 border-2 font-black text-primary gap-2 bg-white">
             <Tag className="h-4 w-4" /> STORE ID: {orgId || '000000'}
           </Badge>
@@ -446,8 +470,13 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
                 {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <Package className="h-6 w-6 text-white" />}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-black text-sm uppercase italic truncate">{item.name}</h3>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase">{item.category}</p>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-black text-sm uppercase italic truncate">{item.name}</h3>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">{item.category}</p>
+                  </div>
+                  <Badge variant="outline" className="text-[8px] font-black">{item.barcode || 'S/C'}</Badge>
+                </div>
                 <div className="flex justify-between items-end mt-1">
                    <p className="font-black text-primary text-md leading-none">${item.price.toFixed(2)}</p>
                    <p className="text-[8px] font-bold opacity-40">REF: {item.reference || 'N/A'}</p>
