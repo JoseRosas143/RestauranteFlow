@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from 'react';
@@ -26,6 +25,7 @@ import { MenuItem, UserProfile, Location, Category, ModifierGroup, Discount } fr
 import { useRouter } from 'next/navigation';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { generateStaffEmail } from '@/ai/flows/staff-email-flow';
 
 export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
@@ -200,7 +200,7 @@ export default function AdminDashboard() {
                  <AdminProfileManager currentProfile={profile} />
               </CardContent>
             </Card>
-            <StaffManager staff={staffUsers || []} orgId={orgId!} locId={locId!} />
+            <StaffManager staff={staffUsers || []} orgId={orgId!} locId={locId!} locationName={currentLocationData?.name || 'Sucursal Principal'} />
           </TabsContent>
 
           <TabsContent value="config">
@@ -698,7 +698,7 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
   );
 }
 
-function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: string, locId: string }) {
+function StaffManager({ staff, orgId, locId, locationName }: { staff: UserProfile[], orgId: string, locId: string, locationName: string }) {
   const db = useFirestore();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -737,9 +737,26 @@ function StaffManager({ staff, orgId, locId }: { staff: UserProfile[], orgId: st
         .finally(() => setLoading(false));
     } else {
       addDoc(path, { ...cleanData, uid: `STAFF-${Date.now()}`, createdAt: Date.now() })
-        .then(() => {
+        .then(async (docRef) => {
+          // Simular envío de email al empleado
+          try {
+             const emailContent = await generateStaffEmail({
+               staffName: newUser.name!,
+               storeName: 'RestauranteFlow',
+               locationName: locationName,
+               role: newUser.role!,
+               pin: newUser.pin!
+             });
+             console.log("SIMULATED STAFF EMAIL:", emailContent);
+             toast({ 
+               title: "Personal añadido", 
+               description: "Se ha enviado la notificación de acceso a su consola." 
+             });
+          } catch (e) {
+             console.error("Staff email simulation failed", e);
+             toast({ title: "Personal añadido" });
+          }
           setNewUser(initialStaffState);
-          toast({ title: "Personal añadido" });
         })
         .catch(async () => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({ path: path.path, operation: 'create', requestResourceData: cleanData }));
