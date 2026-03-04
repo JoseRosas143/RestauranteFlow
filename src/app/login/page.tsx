@@ -27,7 +27,7 @@ export default function LoginPage() {
   useEffect(() => {
     const savedOrgId = localStorage.getItem('restauranteFlow_orgId');
     if (savedOrgId) setStoreId(savedOrgId);
-    else setStoreId('143001'); // Valor por defecto solo si no hay nada guardado
+    else setStoreId('143001'); 
   }, []);
 
   const syncUserProfile = async (user: any, targetStoreId: string) => {
@@ -39,7 +39,6 @@ export default function LoginPage() {
         id: user.uid,
         uid: user.uid,
         email: user.email,
-        role: 'admin',
         orgId: targetStoreId,
         updatedAt: new Date().toISOString()
       };
@@ -49,7 +48,8 @@ export default function LoginPage() {
           ...profileData,
           firstName: user.displayName?.split(' ')[0] || 'Admin',
           lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
-          pin: '1234',
+          role: 'admin',
+          pin: '1234', // PIN por defecto
           createdAt: new Date().toISOString(),
         });
       } else {
@@ -57,7 +57,7 @@ export default function LoginPage() {
         await updateDoc(userDocRef, { 
           orgId: targetStoreId, 
           role: existingData.role || 'admin',
-          pin: existingData.pin || '1234',
+          pin: existingData.pin || '1234', // Garantizar PIN si no existe
           updatedAt: new Date().toISOString() 
         });
       }

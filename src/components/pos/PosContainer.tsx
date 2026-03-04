@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -123,9 +124,9 @@ export default function PosContainer() {
     return items;
   }, [menuItems, selectedCat, search]);
 
+  // Búsqueda dinámica de clientes
   const filteredCustomers = useMemo(() => {
-    if (!allCustomers) return [];
-    if (!customerSearch) return [];
+    if (!allCustomers || !customerSearch.trim()) return [];
     const s = customerSearch.toLowerCase();
     return allCustomers.filter(c => 
       c.name.toLowerCase().includes(s) || 
@@ -304,21 +305,27 @@ export default function PosContainer() {
     toast({ title: `Pedido ${order.id} cargado` });
   };
 
+  // Función corregida para evitar parálisis de interfaz
   const assignCustomerToOrder = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setActiveOrder(prev => {
-        if (!prev) return prev;
-        return {
-            ...prev,
-            customerId: customer.id,
-            customerName: customer.name,
-            customerPhone: customer.phone
-        };
-    });
+    // Cerramos todo primero para limpiar el DOM de Radix
     setIsLoyaltyOpen(false);
     setIsAddingCustomer(false);
     setCustomerSearch('');
-    toast({ title: "Cliente Asignado", description: customer.name });
+
+    // Actualizamos estados en el siguiente tick
+    setTimeout(() => {
+        setSelectedCustomer(customer);
+        setActiveOrder(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                customerId: customer.id,
+                customerName: customer.name,
+                customerPhone: customer.phone
+            };
+        });
+        toast({ title: "Cliente Asignado", description: customer.name });
+    }, 10);
   };
 
   const handleCreateNewCustomer = async () => {
@@ -662,15 +669,21 @@ export default function PosContainer() {
       </Dialog>
 
       {/* Loyalty / Customer Selection Dialog */}
-      <Dialog open={isLoyaltyOpen} onOpenChange={setIsLoyaltyOpen}>
-        <DialogContent className="rounded-none md:rounded-[2.5rem] p-0 md:p-10 max-w-4xl max-h-screen md:max-h-[90vh] overflow-hidden flex flex-col bg-[#1A1A1A] text-white">
+      <Dialog open={isLoyaltyOpen} onOpenChange={(open) => {
+          setIsLoyaltyOpen(open);
+          if (!open) {
+              setCustomerSearch('');
+              setIsAddingCustomer(false);
+          }
+      }}>
+        <DialogContent className="rounded-none md:rounded-[2.5rem] p-0 md:p-10 max-w-4xl max-h-screen md:max-h-[90vh] overflow-hidden flex flex-col bg-[#1A1A1A] text-white border-zinc-800">
             <DialogHeader className="sr-only">
                 <DialogTitle>Programa de Lealtad</DialogTitle>
                 <DialogDescription>Búsqueda y asignación de clientes para recompensas</DialogDescription>
             </DialogHeader>
-            <div className="p-6 md:p-0 flex flex-col h-full">
+            <div className="p-6 md:p-0 flex flex-col h-full overflow-hidden">
               <div className="flex justify-between items-center mb-6">
-                <Button variant="ghost" size="icon" className="text-white rounded-full" onClick={() => { setIsLoyaltyOpen(false); setIsAddingCustomer(false); setCustomerSearch(''); }}><ArrowLeft className="h-6 w-6" /></Button>
+                <Button variant="ghost" size="icon" className="text-white rounded-full hover:bg-white/10" onClick={() => setIsLoyaltyOpen(false)}><ArrowLeft className="h-6 w-6" /></Button>
                 <h2 className="text-xl font-black uppercase italic text-center flex-1">Programa de Lealtad</h2>
                 {!isAddingCustomer && (
                   <Button variant="ghost" className="text-primary font-black uppercase text-xs" onClick={() => setIsAddingCustomer(true)}>
@@ -680,104 +693,105 @@ export default function PosContainer() {
               </div>
 
               {isAddingCustomer ? (
-                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4 p-2">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                          <Label className="text-[10px] font-black uppercase text-zinc-500">Nombre Completo *</Label>
-                         <Input value={newCustomerForm.name} onChange={e => setNewCustomerForm({...newCustomerForm, name: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold" />
+                         <Input value={newCustomerForm.name} onChange={e => setNewCustomerForm({...newCustomerForm, name: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold focus-visible:ring-primary" />
                       </div>
                       <div className="space-y-2">
                          <Label className="text-[10px] font-black uppercase text-zinc-500">Teléfono / Celular *</Label>
-                         <Input value={newCustomerForm.phone} onChange={e => setNewCustomerForm({...newCustomerForm, phone: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold" />
+                         <Input value={newCustomerForm.phone} onChange={e => setNewCustomerForm({...newCustomerForm, phone: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold focus-visible:ring-primary" />
                       </div>
                       <div className="space-y-2">
                          <Label className="text-[10px] font-black uppercase text-zinc-500">Email (Opcional)</Label>
-                         <Input value={newCustomerForm.email} onChange={e => setNewCustomerForm({...newCustomerForm, email: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold" />
+                         <Input value={newCustomerForm.email} onChange={e => setNewCustomerForm({...newCustomerForm, email: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold focus-visible:ring-primary" />
                       </div>
                       <div className="space-y-2">
                          <Label className="text-[10px] font-black uppercase text-zinc-500">Dirección</Label>
-                         <Input value={newCustomerForm.address} onChange={e => setNewCustomerForm({...newCustomerForm, address: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold" />
+                         <Input value={newCustomerForm.address} onChange={e => setNewCustomerForm({...newCustomerForm, address: e.target.value})} className="bg-[#2A2A2A] border-0 h-12 rounded-xl text-white font-bold focus-visible:ring-primary" />
                       </div>
                    </div>
                    <div className="flex gap-4 pt-4">
-                      <Button variant="outline" className="flex-1 h-14 border-white/20 text-white rounded-xl" onClick={() => setIsAddingCustomer(false)}>CANCELAR</Button>
+                      <Button variant="outline" className="flex-1 h-14 border-white/20 text-white rounded-xl hover:bg-white/5" onClick={() => setIsAddingCustomer(false)}>CANCELAR</Button>
                       <Button className="flex-1 h-14 bg-primary hover:bg-primary/90 font-black text-white rounded-xl" onClick={handleCreateNewCustomer}>REGISTRAR Y ASIGNAR</Button>
                    </div>
                 </div>
-              ) : !customerSearch ? (
+              ) : (
                 <div className="space-y-6 flex-1 overflow-hidden flex flex-col">
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <div className="relative px-2">
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
                     <Input 
                       placeholder="Buscar por nombre o teléfono..." 
                       value={customerSearch} 
                       onChange={e => setCustomerSearch(e.target.value)} 
-                      className="bg-[#2A2A2A] border-0 h-14 rounded-2xl pl-12 text-white font-bold"
+                      className="bg-[#2A2A2A] border-0 h-14 rounded-2xl pl-14 text-white font-bold focus-visible:ring-primary"
                     />
                   </div>
-                  <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                    <UserCircle className="h-24 w-24 mb-4" />
-                    <p className="font-black uppercase tracking-widest text-xs">Busque un cliente para comenzar</p>
-                  </div>
-                </div>
-              ) : (
-                <ScrollArea className="flex-1">
-                  <div className="space-y-4 pb-4">
-                    {filteredCustomers.length > 0 ? (
-                      filteredCustomers.map(cust => (
-                        <div key={cust.id} className="bg-[#2A2A2A] rounded-[2rem] p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 mb-4">
-                          <div className="flex flex-col items-center text-center space-y-4">
-                            <div className="w-24 h-24 rounded-full bg-[#3A3A3A] flex items-center justify-center border-4 border-[#4A4A4A]">
-                              <UserCircle className="h-14 w-14 text-zinc-500" />
-                            </div>
-                            <h3 className="text-2xl font-black leading-tight uppercase tracking-tighter">{cust.name}</h3>
-                          </div>
 
-                          <div className="space-y-6">
-                            <div className="flex items-center gap-6"><Mail className="h-6 w-6 text-zinc-500" /> <span className="font-bold text-zinc-300">{cust.email || 'Sin correo'}</span></div>
-                            <div className="flex items-center gap-6"><Phone className="h-6 w-6 text-zinc-500" /> <span className="font-bold text-zinc-300">{cust.phone}</span></div>
-                            <div className="flex items-center gap-6"><MapPin className="h-6 w-6 text-zinc-500" /> <span className="font-bold text-zinc-300">{cust.address || 'Puebla, Puebla'}</span></div>
-                          </div>
+                  <ScrollArea className="flex-1 px-2">
+                    <div className="space-y-4 pb-4">
+                      {customerSearch.trim().length > 0 ? (
+                        filteredCustomers.length > 0 ? (
+                          filteredCustomers.map(cust => (
+                            <div key={cust.id} className="bg-[#2A2A2A] rounded-[2rem] p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 mb-4 border border-zinc-800 hover:border-primary/40 transition-colors">
+                              <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+                                <div className="w-20 h-20 rounded-full bg-[#3A3A3A] flex items-center justify-center border-4 border-[#4A4A4A] shrink-0">
+                                  <UserCircle className="h-12 w-12 text-zinc-500" />
+                                </div>
+                                <div className="flex-1">
+                                  <h3 className="text-2xl font-black leading-tight uppercase tracking-tighter">{cust.name}</h3>
+                                  <div className="flex flex-wrap gap-4 mt-2 justify-center md:justify-start">
+                                    <div className="flex items-center gap-2 text-zinc-400 text-sm font-bold"><Mail className="h-4 w-4" /> {cust.email || 'N/A'}</div>
+                                    <div className="flex items-center gap-2 text-zinc-400 text-sm font-bold"><Phone className="h-4 w-4" /> {cust.phone}</div>
+                                  </div>
+                                </div>
+                              </div>
 
-                          <Separator className="bg-[#3A3A3A]" />
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="flex items-center gap-6">
-                               <Gift className="h-6 w-6 text-zinc-500" />
-                               <div>
-                                  <p className="text-2xl font-black text-white">{cust.points?.toFixed(2) || '0.00'}</p>
-                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Puntos</p>
-                               </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 flex items-center gap-4">
+                                   <Gift className="h-6 w-6 text-primary" />
+                                   <div>
+                                      <p className="text-2xl font-black text-white leading-none">{cust.points?.toFixed(2) || '0.00'}</p>
+                                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Puntos</p>
+                                   </div>
+                                </div>
+                                <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 flex items-center gap-4">
+                                   <ShoppingBag className="h-6 w-6 text-zinc-500" />
+                                   <div>
+                                      <p className="text-2xl font-black text-white leading-none">{cust.visits || 0}</p>
+                                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Visitas</p>
+                                   </div>
+                                </div>
+                                <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 flex items-center gap-4">
+                                   <Calendar className="h-6 w-6 text-zinc-500" />
+                                   <div>
+                                      <p className="text-lg font-black text-white leading-none">{cust.lastVisit ? new Date(cust.lastVisit).toLocaleDateString() : 'Nunca'}</p>
+                                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Última Visita</p>
+                                   </div>
+                                </div>
+                              </div>
+                              
+                              <Button className="w-full h-16 bg-primary hover:bg-primary/90 font-black text-xl rounded-2xl shadow-2xl transition-transform active:scale-95" onClick={() => assignCustomerToOrder(cust)}>
+                                ASIGNAR AL TICKET
+                              </Button>
                             </div>
-                            <div className="flex items-center gap-6">
-                               <ShoppingBag className="h-6 w-6 text-zinc-500" />
-                               <div>
-                                  <p className="text-2xl font-black text-white">{cust.visits || 0}</p>
-                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Visitas</p>
-                               </div>
-                            </div>
-                            <div className="flex items-center gap-6">
-                               <Calendar className="h-6 w-6 text-zinc-500" />
-                               <div>
-                                  <p className="text-lg font-black text-white">{cust.lastVisit ? new Date(cust.lastVisit).toLocaleDateString() : 'N/A'}</p>
-                                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Última</p>
-                               </div>
-                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-20 opacity-40">
+                            <p className="font-black uppercase italic text-zinc-500">No se encontraron clientes</p>
+                            <Button variant="outline" className="mt-4 border-white/20 text-white rounded-xl" onClick={() => setIsAddingCustomer(true)}>Crear Nuevo Cliente</Button>
                           </div>
-                          
-                          <Button className="w-full h-16 bg-primary hover:bg-primary/90 font-black text-xl rounded-2xl shadow-2xl mt-4" onClick={() => assignCustomerToOrder(cust)}>
-                            ASIGNAR AL TICKET
-                          </Button>
+                        )
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center py-20 opacity-40">
+                          <UserCircle className="h-24 w-24 mb-4 text-zinc-700" />
+                          <p className="font-black uppercase tracking-widest text-[10px]">Escriba para buscar o asigne un cliente nuevo</p>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-20 opacity-40">
-                        <p className="font-black uppercase italic">No se encontraron clientes</p>
-                        <Button variant="outline" className="mt-4 border-white/20 text-white rounded-xl" onClick={() => setIsAddingCustomer(true)}>Crear Nuevo Cliente</Button>
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
               )}
             </div>
         </DialogContent>

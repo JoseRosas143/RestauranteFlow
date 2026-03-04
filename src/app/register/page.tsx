@@ -39,17 +39,17 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
-      // Para la primera tienda demo, usaremos 143001 si está libre o generaremos uno.
-      // Aquí generamos uno aleatorio de 6 dígitos para cumplir con la arquitectura comercial.
       const newStoreId = generateStoreId();
       
-      // Crear perfil global
+      // Crear perfil global con PIN por defecto
       await setDoc(doc(db, 'users', user.uid), {
         id: user.uid,
+        uid: user.uid,
         firstName: name.split(' ')[0],
         lastName: name.split(' ').slice(1).join(' ') || '',
         email: email,
         role: 'admin',
+        pin: '1234', // PIN por defecto para administración
         orgId: newStoreId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
