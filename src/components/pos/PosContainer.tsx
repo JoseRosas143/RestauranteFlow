@@ -228,8 +228,10 @@ export default function PosContainer() {
               <p className="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase mt-2">INGRESE PIN DE ACCESO</p>
             </div>
             <div className="flex justify-center gap-3 text-4xl font-black tracking-widest text-primary h-12">
-              {pinInput.padEnd(4, '•').split('').map((char, i) => (
-                <div key={i} className="w-12 border-b-4 border-zinc-700 pb-2">{char}</div>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="w-12 border-b-4 border-zinc-700 pb-2">
+                  {pinInput[i] ? '•' : ''}
+                </div>
               ))}
             </div>
             <div className="grid grid-cols-3 gap-3 pt-4">
@@ -238,7 +240,7 @@ export default function PosContainer() {
                   onClick={() => {
                     if (val === 'C') setPinInput('');
                     else if (val === 'OK') handlePinSubmit();
-                    else if (pinInput.length < 4) setPinInput(prev => prev + val);
+                    else if (pinInput.length < 4) setPinInput(prev => prev + (val.toString()));
                   }}
                 >{val}</Button>
               ))}
@@ -252,9 +254,7 @@ export default function PosContainer() {
 
   return (
     <div className="flex h-screen bg-[#F0F2F5] overflow-hidden">
-      {/* Main Container */}
       <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-        {/* Header Bar */}
         <header className="flex gap-4 items-center bg-white p-3 rounded-2xl shadow-sm border-2">
           <div className="relative flex-1 group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -274,7 +274,6 @@ export default function PosContainer() {
           </Button>
         </header>
 
-        {/* Categories */}
         <div className="flex gap-2 pb-1 overflow-x-auto no-scrollbar">
           <Button variant={selectedCat === 'all' ? 'default' : 'outline'} className="rounded-xl h-10 px-6 font-black uppercase italic tracking-tighter shrink-0" onClick={() => setSelectedCat('all')}>TODOS</Button>
           {categories?.map(cat => (
@@ -282,7 +281,6 @@ export default function PosContainer() {
           ))}
         </div>
 
-        {/* Product Grid */}
         <ScrollArea className="flex-1">
           {menuLoading ? (
             <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>
@@ -302,9 +300,7 @@ export default function PosContainer() {
         </ScrollArea>
       </div>
 
-      {/* Ticket Panel */}
       <aside className="w-[420px] bg-white border-l-2 shadow-2xl flex flex-col">
-        {/* Ticket Top */}
         <div className="p-6 border-b flex justify-between items-center bg-muted/10">
           <div className="flex-1">
             <div className="flex items-center gap-2">
@@ -317,14 +313,14 @@ export default function PosContainer() {
                      <DropdownMenuSeparator />
                      <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3"><Split className="h-4 w-4" /> Dividir Cuenta</DropdownMenuItem>
                      <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3"><ArrowRightLeft className="h-4 w-4" /> Mover Ticket</DropdownMenuItem>
-                     <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3"><Clock className="h-4 w-4" /> Historial Sincronizar</DropdownMenuItem>
+                     <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3"><Clock className="h-4 w-4" /> Sincronizar</DropdownMenuItem>
                   </DropdownMenuContent>
                </DropdownMenu>
             </div>
             <div className="flex items-center gap-2 mt-2">
                <Select value={activeOrder?.tableNumber} onValueChange={v => setActiveOrder(prev => prev ? ({...prev, tableNumber: v}) : null)}>
                   <SelectTrigger className="h-8 w-40 bg-white border-2 rounded-xl text-[10px] font-black uppercase">
-                     <SelectValue placeholder="Asignar Mesa/Tipo" />
+                     <SelectValue placeholder="Mesa/Tipo" />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl">
                      {SERVICE_OPTIONS.map(opt => <SelectItem key={opt} value={opt} className="rounded-xl font-bold uppercase text-[10px]">{opt}</SelectItem>)}
@@ -335,7 +331,6 @@ export default function PosContainer() {
           <Button variant="ghost" size="icon" className="rounded-full text-destructive" onClick={() => setActiveOrder(createEmptyOrder())}><X className="h-6 w-6" /></Button>
         </div>
 
-        {/* Ticket List */}
         <ScrollArea className="flex-1 p-6">
            <div className="space-y-4">
               {activeOrder?.items.map((item, idx) => (
@@ -387,7 +382,6 @@ export default function PosContainer() {
            </div>
         </ScrollArea>
 
-        {/* Ticket Bottom */}
         <div className="p-8 bg-[#F8F9FA] space-y-4 border-t-4 border-t-primary shadow-xl">
            <div className="space-y-1">
              <div className="flex justify-between text-[10px] font-black uppercase text-muted-foreground"><span>Subtotal</span><span>${activeOrder?.subtotal.toFixed(2)}</span></div>
@@ -428,7 +422,6 @@ export default function PosContainer() {
         </div>
       </aside>
 
-      {/* Tickets Abiertos Modal */}
       <Dialog open={isTicketsOpen} onOpenChange={setIsTicketsOpen}>
          <DialogContent className="rounded-[2.5rem] p-10 max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
@@ -466,15 +459,10 @@ export default function PosContainer() {
                                 <span className="mx-1">•</span>
                                 <Clock className="h-3 w-3" /> {new Date(order.createdAt).toLocaleTimeString()}
                              </div>
-                             <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
-                                <User className="h-3 w-3" /> {order.staffName || 'Admin'}
-                             </div>
                           </div>
                           <div className="text-right">
                              <div className="font-black text-2xl">${order.total.toFixed(2)}</div>
-                             <div className="text-[8px] font-bold text-muted-foreground">{order.items.length} items</div>
                              <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-all">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={(e) => { e.stopPropagation(); }}><MoreHorizontal className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10" onClick={(e) => { 
                                   e.stopPropagation(); 
                                   if (confirm("¿Borrar ticket?")) {
@@ -486,18 +474,11 @@ export default function PosContainer() {
                        </CardContent>
                     </Card>
                   ))}
-                  {openOrders?.length === 0 && (
-                    <div className="col-span-full h-40 flex flex-col items-center justify-center opacity-30">
-                       <Receipt className="h-12 w-12 mb-2" />
-                       <p className="font-black uppercase tracking-widest text-xs">No hay tickets abiertos</p>
-                    </div>
-                  )}
                </div>
             </ScrollArea>
          </DialogContent>
       </Dialog>
 
-      {/* Programa Lealtad Modal */}
       <Dialog open={isLoyaltyOpen} onOpenChange={setIsLoyaltyOpen}>
          <DialogContent className="rounded-[2.5rem] p-10 max-w-md">
             <DialogHeader>
@@ -509,17 +490,11 @@ export default function PosContainer() {
                   <Label className="text-[10px] font-black uppercase ml-1">Buscar Cliente</Label>
                   <Input placeholder="Nombre o Teléfono..." className="h-12 rounded-xl" />
                </div>
-               <div className="p-4 bg-primary/5 border-2 border-dashed border-primary/20 rounded-2xl flex items-center justify-center flex-col gap-2">
-                  <Gift className="h-8 w-8 text-primary opacity-40" />
-                  <p className="text-[10px] font-black uppercase opacity-40">Sin clientes frecuentes registrados</p>
-                  <Button variant="link" className="text-primary font-black uppercase text-[10px]">Añadir Nuevo Cliente</Button>
-               </div>
                <Button className="w-full h-14 font-black rounded-xl" onClick={() => setIsLoyaltyOpen(false)}>CERRAR</Button>
             </div>
          </DialogContent>
       </Dialog>
 
-      {/* Item Modifiers Modal */}
       <Dialog open={!!modifyingItem} onOpenChange={() => setModifyingItem(null)}>
          <DialogContent className="rounded-[2.5rem] p-10 max-w-2xl">
             <DialogHeader><DialogTitle className="font-black text-3xl uppercase italic text-primary">Modificadores: {modifyingItem?.item.name}</DialogTitle></DialogHeader>
