@@ -122,7 +122,7 @@ export default function AdminDashboard() {
       <main className="flex-1 p-8">
         <Tabs defaultValue="menu" className="space-y-6 max-w-7xl mx-auto">
           <TabsList className="bg-white border-2 shadow-sm w-full h-16 p-2 gap-2 rounded-[1.25rem]">
-            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Artículos</TabsTrigger>
+            <TabsTrigger value="menu" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Package className="h-4 w-4" /> Gestión de Menú</TabsTrigger>
             <TabsTrigger value="personal" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Users className="h-4 w-4" /> Equipo</TabsTrigger>
             <TabsTrigger value="config" className="flex-1 gap-2 data-[state=active]:bg-primary data-[state=active]:text-white font-black uppercase tracking-tighter rounded-xl"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           </TabsList>
@@ -131,7 +131,7 @@ export default function AdminDashboard() {
             <section className="space-y-6">
               <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                 <Package className="h-6 w-6 text-primary" />
-                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Gestión de Menú</h2>
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter">Artículos</h2>
               </div>
               <ArticulosManager items={items || []} categories={categories || []} modifiers={modifiers || []} orgId={orgId!} locId={locId!} />
             </section>
@@ -819,17 +819,16 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
       return;
     }
     
-    // Usamos un sistema de confirmación más robusto para debug
-    const confirmDelete = window.confirm(`¿Está seguro de que desea eliminar la sucursal "${name}"?`);
+    // Usamos un sistema de confirmación nativo para mayor fiabilidad
+    const confirmDelete = window.confirm(`¿Está seguro de que desea eliminar permanentemente la sucursal "${name}"?`);
     if (!confirmDelete) return;
 
     const docRef = doc(db, 'orgs', orgId, 'locations', id);
     deleteDoc(docRef)
       .then(() => {
-        toast({ title: "Sede eliminada con éxito" });
+        toast({ title: "Sede eliminada" });
       })
       .catch(async (error) => {
-        console.error("Error deleting location:", error);
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
       });
   };
@@ -847,15 +846,15 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
              <ScrollArea className="h-[300px] pr-2">
                 <div className="space-y-2">
                    {allLocations.map(l => (
-                      <div key={l.id} className="group relative flex items-center gap-2">
+                      <div key={l.id} className="flex items-center gap-2 p-1">
                         <Button 
                           variant={l.id === locId ? 'default' : 'outline'} 
-                          className="flex-1 h-16 justify-between rounded-xl px-4 border-2 overflow-hidden"
+                          className="flex-1 h-16 justify-between rounded-xl px-4 border-2 overflow-hidden group"
                           onClick={() => setLoc(l)}
                         >
                           <div className="text-left">
-                             <div className="font-black text-xs uppercase truncate max-w-[120px]">{l.name}</div>
-                             <div className="text-[8px] font-bold opacity-60 truncate max-w-[120px]">{l.address || 'Ubicación central'}</div>
+                             <div className="font-black text-xs uppercase truncate max-w-[150px]">{l.name}</div>
+                             <div className="text-[8px] font-bold opacity-60 truncate max-w-[150px]">{l.address || 'Ubicación central'}</div>
                           </div>
                           {l.id === locId && <Badge className="bg-white text-primary text-[8px] font-black">ACTIVA</Badge>}
                         </Button>
@@ -864,12 +863,8 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
                            <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-12 w-12 text-destructive hover:bg-destructive/10 rounded-xl shrink-0"
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                e.preventDefault();
-                                deleteLocation(l.id, l.name); 
-                              }}
+                              className="h-16 w-12 text-destructive hover:bg-destructive/10 rounded-xl shrink-0"
+                              onClick={() => deleteLocation(l.id, l.name)}
                            >
                               <Trash2 className="h-5 w-5" />
                            </Button>
@@ -951,4 +946,3 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
     </div>
   );
 }
-
