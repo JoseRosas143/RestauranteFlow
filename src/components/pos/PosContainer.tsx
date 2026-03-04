@@ -306,12 +306,15 @@ export default function PosContainer() {
 
   const assignCustomerToOrder = (customer: Customer) => {
     setSelectedCustomer(customer);
-    setActiveOrder(prev => prev ? ({
-      ...prev,
-      customerId: customer.id,
-      customerName: customer.name,
-      customerPhone: customer.phone
-    }) : null);
+    setActiveOrder(prev => {
+        if (!prev) return prev;
+        return {
+            ...prev,
+            customerId: customer.id,
+            customerName: customer.name,
+            customerPhone: customer.phone
+        };
+    });
     setIsLoyaltyOpen(false);
     setIsAddingCustomer(false);
     setCustomerSearch('');
