@@ -4,8 +4,22 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Regla global definitiva para desarrollo: 
     // Cualquier usuario autenticado tiene permiso total sobre cualquier documento o colección.
-    // Esto resuelve los errores de "list" y "update" en rutas profundas como /orgs/{id}/locations/{id}/orders
+    // Se utiliza una estructura más explícita para asegurar que la recursividad (**) 
+    // funcione correctamente en todas las profundidades de la jerarquía orgs/locations/orders.
+    
     match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Reglas de respaldo específicas para rutas críticas
+    match /orgs/{orgId} {
+      allow read, write: if request.auth != null;
+      match /{allSubcollections=**} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    match /users/{userId} {
       allow read, write: if request.auth != null;
     }
   }

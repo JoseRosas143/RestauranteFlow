@@ -5,22 +5,21 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MenuItem, Order, OrderItem, UserProfile, Category, ServiceType, DiscountType, ModifierGroup, Discount } from '@/lib/types';
 import { 
   Plus, Minus, Trash2, CreditCard, Banknote, X, ShoppingBag, 
-  ArrowLeft, User, MessageSquare, Wallet, Search, Loader2, 
-  KeyRound, LogOut, Tag, Receipt, ChevronRight, Hash, Percent, Split, 
-  Menu, Save, Utensils, Clock, Users, Gift, MoreHorizontal, ArrowRightLeft, Eraser, Trash
+  Search, Loader2, KeyRound, LogOut, Tag, Receipt, ChevronRight, 
+  Menu, Save, Utensils, Clock, Gift, ArrowRightLeft, Eraser, Trash
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useTenant, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, doc, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, getDocs, where } from 'firebase/firestore';
+import { collection, doc, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import LocationSelector from '@/components/tenant/LocationSelector';
 
@@ -311,7 +310,6 @@ export default function PosContainer() {
                      <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3" onClick={() => setActiveOrder(createEmptyOrder())}><Eraser className="h-4 w-4" /> Despejar Ticket</DropdownMenuItem>
                      <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3" onClick={() => setIsLoyaltyOpen(true)}><Gift className="h-4 w-4" /> Programa Lealtad</DropdownMenuItem>
                      <DropdownMenuSeparator />
-                     <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3"><Split className="h-4 w-4" /> Dividir Cuenta</DropdownMenuItem>
                      <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3"><ArrowRightLeft className="h-4 w-4" /> Mover Ticket</DropdownMenuItem>
                      <DropdownMenuItem className="rounded-xl font-bold uppercase text-[10px] py-3 gap-3"><Clock className="h-4 w-4" /> Sincronizar</DropdownMenuItem>
                   </DropdownMenuContent>
@@ -362,7 +360,7 @@ export default function PosContainer() {
                       <div className="text-right">
                          <span className="font-black text-primary">${((item.priceAtOrder + item.selectedModifiers.reduce((acc, m) => acc + m.price, 0)) * item.quantity).toFixed(2)}</span>
                          <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-muted" onClick={() => setModifyingItem({ item, index: idx })}><MessageSquare className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-muted" onClick={() => setModifyingItem({ item, index: idx })}><Receipt className="h-3 w-3" /></Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => {
                                const newItems = [...activeOrder.items];
                                newItems.splice(idx, 1);
@@ -435,14 +433,6 @@ export default function PosContainer() {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Buscar por ID, mesa o cliente..." className="pl-12 rounded-xl h-12" />
                </div>
-               <Select defaultValue="fecha">
-                  <SelectTrigger className="w-40 rounded-xl h-12 font-bold uppercase text-[10px]"><SelectValue placeholder="Ordenar por" /></SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                     <SelectItem value="fecha" className="font-bold uppercase text-[10px]">Fecha</SelectItem>
-                     <SelectItem value="mesa" className="font-bold uppercase text-[10px]">Mesa</SelectItem>
-                     <SelectItem value="total" className="font-bold uppercase text-[10px]">Total</SelectItem>
-                  </SelectContent>
-               </Select>
             </div>
             <ScrollArea className="flex-1 mt-6">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
@@ -476,58 +466,6 @@ export default function PosContainer() {
                   ))}
                </div>
             </ScrollArea>
-         </DialogContent>
-      </Dialog>
-
-      <Dialog open={isLoyaltyOpen} onOpenChange={setIsLoyaltyOpen}>
-         <DialogContent className="rounded-[2.5rem] p-10 max-w-md">
-            <DialogHeader>
-               <DialogTitle className="font-black text-3xl uppercase italic text-primary">Programa Lealtad</DialogTitle>
-               <DialogDescription className="font-bold uppercase text-[10px] tracking-widest">Asignar cliente para recompensas</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6 pt-6">
-               <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase ml-1">Buscar Cliente</Label>
-                  <Input placeholder="Nombre o Teléfono..." className="h-12 rounded-xl" />
-               </div>
-               <Button className="w-full h-14 font-black rounded-xl" onClick={() => setIsLoyaltyOpen(false)}>CERRAR</Button>
-            </div>
-         </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!modifyingItem} onOpenChange={() => setModifyingItem(null)}>
-         <DialogContent className="rounded-[2.5rem] p-10 max-w-2xl">
-            <DialogHeader><DialogTitle className="font-black text-3xl uppercase italic text-primary">Modificadores: {modifyingItem?.item.name}</DialogTitle></DialogHeader>
-            <div className="space-y-6 pt-6">
-               {allModifiers?.filter(m => menuItems?.find(mi => mi.id === modifyingItem?.item.menuItemId)?.modifierIds.includes(m.id!)).map(group => (
-                 <div key={group.id} className="space-y-3">
-                   <Label className="text-[10px] font-black uppercase text-muted-foreground">{group.name}</Label>
-                   <div className="flex flex-wrap gap-2">
-                      {group.options.map((opt, i) => {
-                        const isSelected = modifyingItem?.item.selectedModifiers.some(m => m.name === opt.name);
-                        return (
-                          <Button key={i} variant={isSelected ? 'default' : 'outline'} className="rounded-xl font-bold h-12 px-6" onClick={() => {
-                             const newItems = [...(activeOrder?.items || [])];
-                             const currentMods = [...newItems[modifyingItem!.index].selectedModifiers];
-                             if (isSelected) newItems[modifyingItem!.index].selectedModifiers = currentMods.filter(m => m.name !== opt.name);
-                             else newItems[modifyingItem!.index].selectedModifiers = [...currentMods, opt];
-                             updateOrderTotals(newItems, activeOrder?.discountAmount, activeOrder?.discountType);
-                          }}>{opt.name} <span className="ml-2 text-[10px] opacity-60">+${opt.price}</span></Button>
-                        );
-                      })}
-                   </div>
-                 </div>
-               ))}
-               <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase">Notas Especiales</Label>
-                  <Input value={modifyingItem?.item.notes || ''} onChange={e => {
-                     const newItems = [...(activeOrder?.items || [])];
-                     newItems[modifyingItem!.index].notes = e.target.value;
-                     updateOrderTotals(newItems, activeOrder?.discountAmount, activeOrder?.discountType);
-                  }} className="h-12 rounded-xl" />
-               </div>
-               <Button className="w-full h-14 font-black rounded-xl" onClick={() => setModifyingItem(null)}>CONFIRMAR</Button>
-            </div>
          </DialogContent>
       </Dialog>
     </div>
