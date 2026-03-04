@@ -6,7 +6,7 @@ import {
   Plus, Minus, Trash2, CreditCard, Banknote, X, ShoppingBag, 
   Search, Loader2, KeyRound, LogOut, Tag, Receipt, ChevronRight, 
   Menu, Save, Utensils, Clock, Gift, ArrowRightLeft, Eraser, Trash,
-  Edit3, MessageSquare, Check
+  Edit3, MessageSquare, Check, Sliders
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,6 @@ import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useTenant, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Checkbox } from '@/components/ui/checkbox';
 import LocationSelector from '@/components/tenant/LocationSelector';
 
 const SERVICE_OPTIONS = [
@@ -292,7 +291,7 @@ export default function PosContainer() {
             </div>
             <div className="grid grid-cols-3 gap-3 pt-4">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, 'OK'].map((val) => (
-                <Button key={val} variant="outline" className="h-16 text-2xl font-black rounded-2xl border-white/5 bg-zinc-800/50 hover:bg-primary active:scale-90"
+                <Button key={val} variant="outline" className="h-16 text-2xl font-black rounded-2xl border-white/5 bg-zinc-800/50 hover:bg-primary transition-all active:scale-90"
                   onClick={() => {
                     if (val === 'C') setPinInput('');
                     else if (val === 'OK') handlePinSubmit();
@@ -406,7 +405,7 @@ export default function PosContainer() {
                                updateOrderTotals(newItems, activeOrder.discountAmount, activeOrder.discountType);
                             }}><Minus className="h-3 w-3" /></Button>
                          </div>
-                         <div className="cursor-pointer flex-1" onClick={() => openItemEditor(item, idx)}>
+                         <div className="cursor-pointer flex-1">
                             <h4 className="font-black text-sm uppercase italic leading-tight group-hover:text-primary transition-colors">{item.name}</h4>
                             <div className="flex flex-wrap gap-1 mt-1">
                                {item.selectedModifiers?.map((m, mIdx) => <Badge key={mIdx} variant="secondary" className="text-[8px] font-bold">+{m.name}</Badge>)}
@@ -416,8 +415,15 @@ export default function PosContainer() {
                       </div>
                       <div className="text-right">
                          <span className="font-black text-primary">${((item.priceAtOrder + (item.selectedModifiers?.reduce((acc, m) => acc + m.price, 0) || 0)) * item.quantity).toFixed(2)}</span>
-                         <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-muted" onClick={() => openItemEditor(item, idx)}><Edit3 className="h-3 w-3" /></Button>
+                         <div className="flex flex-col gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-all items-end">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-7 px-2 text-[8px] font-black uppercase rounded-lg border-primary/20 text-primary hover:bg-primary/10"
+                              onClick={() => openItemEditor(item, idx)}
+                            >
+                              <Sliders className="h-3 w-3 mr-1" /> MODIFICADORES
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => {
                                const newItems = [...activeOrder.items];
                                newItems.splice(idx, 1);
@@ -500,7 +506,7 @@ export default function PosContainer() {
                     />
                 </div>
 
-                {availableModifiers.length > 0 && (
+                {availableModifiers.length > 0 ? (
                     <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                         {availableModifiers.map((group) => (
                             <div key={group.id} className="space-y-2">
@@ -512,12 +518,12 @@ export default function PosContainer() {
                                             <Button 
                                                 key={idx} 
                                                 variant={isSelected ? "default" : "outline"}
-                                                className={`h-12 rounded-xl border-2 flex justify-between px-3 group transition-all ${isSelected ? 'shadow-md scale-[1.02]' : 'hover:border-primary/40'}`}
+                                                className={`h-12 rounded-xl border-2 flex justify-between px-3 group transition-all ${isSelected ? 'shadow-md scale-[1.02] bg-primary text-white border-primary' : 'hover:border-primary/40'}`}
                                                 onClick={() => {
                                                     if (isSelected) {
                                                         setModifyingSelectedMods(modifyingSelectedMods.filter(m => m.name !== opt.name));
                                                     } else {
-                                                        setModifyingSelectedMods([...modifyingSelectedMods, opt]);
+                                                        setModifyingSelectedMods([...modifyingSelectedMods, { name: opt.name, price: Number(opt.price) || 0 }]);
                                                     }
                                                 }}
                                             >
@@ -532,6 +538,10 @@ export default function PosContainer() {
                             </div>
                         ))}
                     </div>
+                ) : (
+                  <div className="py-8 text-center bg-muted/20 rounded-2xl border-2 border-dashed">
+                     <p className="text-[10px] font-black uppercase text-muted-foreground italic">No hay grupos de modificadores vinculados a este producto</p>
+                  </div>
                 )}
             </div>
 
