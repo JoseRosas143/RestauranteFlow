@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useFirestore, useCollection, useDoc, useTenant, useMemoFirebase, useAuth, useUser } from '@/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, getDocs, writeBatch } from 'firebase/firestore';
@@ -95,9 +94,10 @@ export default function AdminDashboard() {
     if (!orgId || !locId) return;
     if (!window.confirm("¿ESTÁ SEGURO? Se borrarán todos los artículos, categorías, modificadores y descuentos de esta sucursal.")) return;
 
+    const batch = writeBatch(db);
+    const collectionsToDelete = ['menuItems', 'categories', 'modifiers', 'discounts'];
+    
     try {
-      const batch = writeBatch(db);
-      const collectionsToDelete = ['menuItems', 'categories', 'modifiers', 'discounts'];
       for (const colName of collectionsToDelete) {
         const colRef = collection(db, 'orgs', orgId, 'locations', locId, colName);
         const snap = await getDocs(colRef);
@@ -165,7 +165,7 @@ export default function AdminDashboard() {
                   <Layers className="h-6 w-6 text-primary" />
                   <h2 className="text-xl font-black uppercase italic tracking-tighter">Categorías</h2>
                 </div>
-                <CategoriasManager categories={categories || []} items={items || []} orgId={orgId!} locId={locId!} />
+                <CategoriasManager categories={categories || []} orgId={orgId!} locId={locId!} />
               </section>
 
               <section className="space-y-6">
@@ -219,22 +219,24 @@ function AdminProfileManager({ currentProfile }: { currentProfile: any }) {
   const [newPin, setNewPin] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const updatePin = async () => {
+  const updatePin = () => {
     if (newPin.length !== 4) {
       toast({ variant: 'destructive', title: 'PIN Inválido', description: 'Debe ser de 4 dígitos.' });
       return;
     }
     setLoading(true);
-    try {
-      const userRef = doc(db, 'users', currentProfile.id);
-      await updateDoc(userRef, { pin: newPin, updatedAt: new Date().toISOString() });
-      toast({ title: 'PIN Actualizado', description: 'PIN personal actualizado con éxito.' });
-      setNewPin('');
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el PIN.' });
-    } finally {
-      setLoading(false);
-    }
+    const userRef = doc(db, 'users', currentProfile.id);
+    const updateData = { pin: newPin, updatedAt: new Date().toISOString() };
+    
+    updateDoc(userRef, updateData)
+      .then(() => {
+        toast({ title: 'PIN Actualizado', description: 'PIN personal actualizado con éxito.' });
+        setNewPin('');
+      })
+      .catch(async () => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: userRef.path, operation: 'update', requestResourceData: updateData }));
+      })
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -397,7 +399,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
               <Label className="text-[10px] font-black uppercase">Imagen</Label>
               <div className="flex gap-4 items-center">
                 <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
-                  {form.image ? <img src={form.image} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
+                  {form.image ? <img src={form.image} className="w-full h-full object-cover" alt="preview" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
                 </div>
                 <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-[8px] flex-1 rounded-xl file:mr-2 file:bg-primary file:text-white file:border-0" />
               </div>
@@ -453,7 +455,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
           <Card key={item.id} className="rounded-2xl border-2 hover:border-primary transition-all group overflow-hidden bg-white shadow-sm">
             <div className="p-4 flex items-center gap-4">
               <div className={`w-14 h-14 rounded-xl border-2 flex-shrink-0 flex items-center justify-center overflow-hidden ${item.tpvShape === 'circulo' ? 'rounded-full' : ''}`} style={{ backgroundColor: item.tpvColor }}>
-                {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <Package className="h-6 w-6 text-white" />}
+                {item.image ? <img src={item.image} className="w-full h-full object-cover" alt={item.name} /> : <Package className="h-6 w-6 text-white" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start">
@@ -484,7 +486,7 @@ function ArticulosManager({ items, categories, modifiers, orgId, locId }: { item
   );
 }
 
-function CategoriasManager({ categories, items, orgId, locId }: { categories: Category[], items: MenuItem[], orgId: string, locId: string }) {
+function CategoriasManager({ categories, orgId, locId }: { categories: Category[], orgId: string, locId: string }) {
   const db = useFirestore();
   const { toast } = useToast();
   const [form, setForm] = useState({ name: '', color: '#B8732E' });
@@ -648,7 +650,7 @@ function DiscountsManager({ discounts, orgId, locId }: { discounts: Discount[], 
         toast({ title: "Descuento activado" });
       })
       .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: form }));
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: form }));
       });
   };
 
@@ -738,8 +740,7 @@ function StaffManager({ staff, orgId, locId, locationName }: { staff: UserProfil
         .finally(() => setLoading(false));
     } else {
       addDoc(path, { ...cleanData, uid: `STAFF-${Date.now()}`, createdAt: Date.now() })
-        .then(async (docRef) => {
-          // Simular envío de email al empleado
+        .then(async () => {
           try {
              const emailContent = await generateStaffEmail({
                staffName: newUser.name!,
@@ -749,12 +750,8 @@ function StaffManager({ staff, orgId, locId, locationName }: { staff: UserProfil
                pin: newUser.pin!
              });
              console.log("SIMULATED STAFF EMAIL:", emailContent);
-             toast({ 
-               title: "Personal añadido", 
-               description: "Se ha enviado la notificación de acceso a su consola." 
-             });
+             toast({ title: "Personal añadido", description: "Notificación de acceso simulada en consola." });
           } catch (e) {
-             console.error("Staff email simulation failed", e);
              toast({ title: "Personal añadido" });
           }
           setNewUser(initialStaffState);
@@ -876,7 +873,7 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
     const docRef = doc(db, 'orgs', orgId, 'locations', locId);
     updateDoc(docRef, { ...form, updatedAt: Date.now() })
       .then(() => {
-        toast({ title: "Configuración actualizada", description: "Datos financieros y de ticket guardados." });
+        toast({ title: "Configuración actualizada" });
       })
       .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: form }));
@@ -884,7 +881,7 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
       .finally(() => setLoading(false));
   };
 
-  const createNewLocation = async () => {
+  const createNewLocation = () => {
     const name = prompt("Nombre de la nueva sucursal:");
     if (!name) return;
     const colRef = collection(db, 'orgs', orgId, 'locations');
@@ -896,15 +893,11 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
       address: '',
       phoneNumber: ''
     })
-      .then(() => {
-        toast({ title: "Sucursal creada" });
-      })
-      .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create' }));
-      });
+      .then(() => toast({ title: "Sucursal creada" }))
+      .catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create' })));
   };
 
-  const deleteLocation = async (e: React.MouseEvent, id: string, name: string) => {
+  const deleteLocation = (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation();
     if (id === locId) {
       toast({ variant: 'destructive', title: 'Acción bloqueada', description: 'No puedes eliminar la sucursal activa.' });
@@ -912,13 +905,10 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
     }
     if (!window.confirm(`¿Eliminar sucursal "${name}"?`)) return;
 
-    try {
-      const docRef = doc(db, 'orgs', orgId, 'locations', id);
-      await deleteDoc(docRef);
-      toast({ title: "Sede eliminada" });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error al eliminar' });
-    }
+    const docRef = doc(db, 'orgs', orgId, 'locations', id);
+    deleteDoc(docRef)
+      .then(() => toast({ title: "Sede eliminada" }))
+      .catch(async () => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
   };
 
   return (
@@ -992,7 +982,7 @@ function ConfigManager({ location, orgId, locId, allLocations }: { location?: Lo
                 <Label className="text-[10px] font-black uppercase">Logo</Label>
                 <div className="flex gap-4 items-center">
                    <div className="w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-muted overflow-hidden">
-                      {form.logo ? <img src={form.logo} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
+                      {form.logo ? <img src={form.logo} className="w-full h-full object-cover" alt="logo" /> : <ImageIcon className="h-6 w-6 opacity-20" />}
                    </div>
                    <Input type="file" accept="image/*" onChange={handleLogoChange} className="h-10 text-[8px] flex-1 rounded-xl" />
                 </div>
